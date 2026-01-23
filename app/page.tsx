@@ -46,6 +46,7 @@ export default function Chat() {
   const [mounted, setMounted] = useState(false);
   const [assessmentComplete, setAssessmentComplete] = useState(false);
   const [assessmentReport, setAssessmentReport] = useState('');
+  const [submissionError, setSubmissionError] = useState('');
   const hasSubmittedRef = useRef(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -91,14 +92,23 @@ export default function Chat() {
         conversationHistory: sanitizedHistory,
       };
 
-      await fetch('/api/submit', {
+      const response = await fetch('/api/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || 'Failed to submit assessment');
+      }
     } catch (error) {
       console.error('Failed to submit assessment:', error);
-      // Don't show error to user - submission is not critical for UX
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to submit assessment';
+      setSubmissionError(
+        `Warning: ${errorMessage}. Your assessment is still complete and can be downloaded below.`
+      );
     }
   };
 
@@ -164,6 +174,14 @@ export default function Chat() {
         {isLoading && <LoadingIndicator />}
 
         {error && <ErrorAlert message={`Error: ${error.message}`} severity="error" />}
+
+        {submissionError && (
+          <ErrorAlert
+            message={submissionError}
+            severity="warning"
+            onClose={() => setSubmissionError('')}
+          />
+        )}
 
         {assessmentComplete && (
           <AssessmentComplete

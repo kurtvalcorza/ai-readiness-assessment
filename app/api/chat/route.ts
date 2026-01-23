@@ -9,8 +9,8 @@ import { systemPrompt } from '@/lib/systemPrompt';
 import { validateEnv } from '@/lib/env';
 import { checkChatRateLimit } from '@/lib/rate-limit';
 import { validateMessageContent, detectPromptInjection } from '@/lib/validation';
-import { MAX_MESSAGE_LENGTH, MAX_MESSAGES_COUNT } from '@/lib/constants';
-import { CoreMessage } from '@/lib/types';
+import { MAX_MESSAGE_LENGTH, MAX_MESSAGES_COUNT, BLOCK_PROMPT_INJECTION } from '@/lib/constants';
+import { CoreMessage, IncomingMessage } from '@/lib/types';
 
 export const maxDuration = 30;
 
@@ -62,12 +62,12 @@ export async function POST(req: Request) {
     }
 
     // Convert to CoreMessage format and validate content
-    const coreMessages: CoreMessage[] = messages.map((m: any) => {
+    const coreMessages: CoreMessage[] = messages.map((m: IncomingMessage) => {
       let content = '';
       if (m.parts) {
         content = m.parts
-          .filter((p: any) => p.type === 'text')
-          .map((p: any) => p.text)
+          .filter((p) => p.type === 'text')
+          .map((p) => p.text)
           .join('');
       } else if (typeof m.content === 'string') {
         content = m.content;
@@ -87,7 +87,13 @@ export async function POST(req: Request) {
         const injectionPatterns = detectPromptInjection(content);
         if (injectionPatterns.length > 0) {
           console.warn('Potential prompt injection detected:', injectionPatterns);
-          // Log but don't block - false positives are possible
+
+          if (BLOCK_PROMPT_INJECTION) {
+            throw new Error(
+              'Your message contains patterns that may indicate a security risk. ' +
+                'Please rephrase your response and avoid using system commands or unusual formatting.'
+            );
+          }
         }
       }
 

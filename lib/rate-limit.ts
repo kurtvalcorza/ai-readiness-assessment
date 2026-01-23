@@ -93,15 +93,23 @@ class VercelKVRateLimiter {
 
     const now = Date.now();
     const windowKey = `ratelimit:${key}:${Math.floor(now / this.windowMs)}`;
+    const expirySeconds = Math.ceil(this.windowMs / 1000);
 
     try {
-      // Increment counter with expiry
-      const count = await this.kv.incr(windowKey);
+      // Use pipeline to make operations atomic and reduce round trips
+      const pipeline = this.kv.pipeline();
 
-      // Set expiry on first request
-      if (count === 1) {
-        await this.kv.expire(windowKey, Math.ceil(this.windowMs / 1000));
-      }
+      // Increment counter
+      pipeline.incr(windowKey);
+
+      // Set expiry (will override existing TTL, which is fine for rate limiting)
+      pipeline.expire(windowKey, expirySeconds);
+
+      // Execute both commands atomically
+      const results = await pipeline.exec();
+
+      // First result is the incremented count
+      const count = results[0] as number;
 
       const allowed = count <= maxRequests;
       const remaining = Math.max(0, maxRequests - count);
