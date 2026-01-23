@@ -120,7 +120,7 @@ What agency or organization do you work for?`
       const domainMatch = report.match(/\*\*Domain:\*\*\s*(.+)/);
       const readinessMatch = report.match(/\*\*Readiness Level:\*\*\s*(.+)/);
 
-      // Extract solutions from markdown table
+      // Extract solutions from text format
       const solutions: Array<{
         priority: string;
         group: string;
@@ -129,21 +129,16 @@ What agency or organization do you work for?`
         rationale: string;
       }> = [];
 
-      // Match the solutions table
-      const tableMatch = report.match(/\| Priority \| Group \| Category \| Fit \| Rationale \|[\s\S]*?\n((?:\|[^\n]+\|\n)+)/);
-      if (tableMatch) {
-        const rows = tableMatch[1].split('\n').filter(row => row.trim() && !row.includes('---'));
-        rows.forEach(row => {
-          const cells = row.split('|').map(cell => cell.trim()).filter(cell => cell);
-          if (cells.length >= 5) {
-            solutions.push({
-              priority: cells[0],
-              group: cells[1],
-              category: cells[2],
-              fit: cells[3],
-              rationale: cells[4]
-            });
-          }
+      // Match solutions in the new text format: #### Priority - Category
+      const solutionPattern = /####\s+(\w+)\s+-\s+(.+?)\n\*\*Group:\*\*\s+(.+?)\n\*\*Fit:\*\*\s+(.+?)\n\*\*Rationale:\*\*\s+(.+?)(?=\n####|\n###|\n---|\n\*\*|$)/gs;
+      let match;
+      while ((match = solutionPattern.exec(report)) !== null) {
+        solutions.push({
+          priority: match[1].trim(),
+          group: match[3].trim(),
+          category: match[2].trim(),
+          fit: match[4].trim(),
+          rationale: match[5].trim()
         });
       }
 

@@ -127,10 +127,15 @@ At the end of the interview, output the assessment in this Markdown format:
 
 ### AI Solution Needs
 
-| Priority | Group | Category | Fit | Rationale |
-| --- | --- | --- | --- | --- |
-| Primary | [Group] | [Category] | [Fit] | [Why] |
-| Secondary | [Group] | [Category] | [Fit] | [Why] |
+#### Primary - [Category]
+**Group:** [Group]
+**Fit:** [Fit]
+**Rationale:** [Why]
+
+#### Secondary - [Category]
+**Group:** [Group]
+**Fit:** [Fit]
+**Rationale:** [Why]
 
 ### Recommended Next Steps
 1. [Recommendation 1]
