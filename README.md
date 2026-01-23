@@ -7,8 +7,10 @@ A self-service chatbot for assessing AI readiness of Philippine government agenc
 - **Interactive Assessment**: 12-question guided interview
 - **AI-Powered**: Uses Google's Gemini 2.5 Flash for intelligent conversations
 - **Automatic Report Generation**: Creates customized assessment reports
-- **Data Collection**: Automatically saves responses to Google Sheets
+- **Session Management**: Conversations automatically end after report generation
+- **Data Collection**: Automatically saves responses to Google Sheets with full solution details
 - **Download Reports**: Users can download their assessment as Markdown
+- **Security Guardrails**: Input validation, rate limiting, and PII redaction
 - **Responsive Design**: Works on desktop and mobile devices
 
 ## Tech Stack
@@ -48,9 +50,15 @@ A self-service chatbot for assessing AI readiness of Philippine government agenc
 
 ### Google Sheets Setup (Optional - for collecting responses)
 
-1. Create a Google Sheet with these headers:
-   - A1: Timestamp, B1: Organization, C1: Domain, D1: Readiness Level
-   - E1: Primary Solution, F1: Secondary Solution, G1: Next Steps, H1: Conversation History
+1. Create a Google Sheet with these headers in Row 1:
+   - **Column A**: Timestamp
+   - **Column B**: Organization
+   - **Column C**: Domain
+   - **Column D**: Readiness Level
+   - **Column E**: Primary Solution (automatically extracted from report)
+   - **Column F**: Secondary Solution (automatically extracted from report)
+   - **Column G**: Next Steps (automatically extracted from report)
+   - **Column H**: Conversation History (sanitized with PII redacted)
 
 2. Go to **Extensions** → **Apps Script** and paste this code:
 
@@ -109,8 +117,13 @@ ai-readiness-assessment/
    - Readiness Signals
    - Interest & Constraints
 3. **AI generates report** - Customized assessment with readiness level and recommendations
-4. **Data saved** - Response automatically sent to Google Sheets
-5. **Download available** - User can download Markdown report
+4. **Data saved** - Response automatically sent to Google Sheets with full details:
+   - Organization, Domain, Readiness Level
+   - Primary and Secondary AI solutions
+   - Next steps for implementation
+   - Sanitized conversation history (with PII redacted)
+5. **Session ends** - Input form disabled, preventing further conversation
+6. **Download available** - User can download Markdown report or start a new assessment
 
 ## Assessment Output
 
@@ -118,6 +131,21 @@ The tool provides:
 - **Readiness Classification**: High/Medium/Low
 - **AI Solution Recommendations**: Prioritized list of suitable AI solutions
 - **Next Steps**: Actionable recommendations for AI adoption
+
+## Security Features
+
+This application implements multiple layers of security to protect against abuse and data breaches:
+
+- **Input Validation**: 2,000 character limit per message, content quality checks
+- **Rate Limiting**:
+  - 30 requests per minute for chat API
+  - 5 submissions per 5 minutes for data submission
+- **PII Redaction**: Automatic redaction of emails and phone numbers from stored data
+- **Session Control**: Input disabled after assessment completion
+- **Prompt Injection Detection**: Monitors for suspicious patterns
+- **Data Sanitization**: Conversation history sanitized before storage
+
+For detailed security information, see [SECURITY.md](./SECURITY.md)
 
 ## Environment Variables
 
