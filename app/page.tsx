@@ -130,7 +130,7 @@ What agency or organization do you work for?`
       }> = [];
 
       // Match solutions in the new text format: #### Priority - Category
-      const solutionPattern = /####\s+(\w+)\s+-\s+(.+?)\n\*\*Group:\*\*\s+(.+?)\n\*\*Fit:\*\*\s+(.+?)\n\*\*Rationale:\*\*\s+(.+?)(?=\n####|\n###|\n---|\n\*\*|$)/gs;
+      const solutionPattern = /####\s+(\w+)\s+-\s+([^\n]+)\n\*\*Group:\*\*\s+([^\n]+)\n\*\*Fit:\*\*\s+([^\n]+)\n\*\*Rationale:\*\*\s+([\s\S]+?)(?=\n####|\n###|\n---|\n\*\*Thank you|$)/g;
       let match;
       while ((match = solutionPattern.exec(report)) !== null) {
         solutions.push({
