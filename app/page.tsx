@@ -126,8 +126,8 @@ What agency or organization do you work for?`
 
   return (
     <div className="flex flex-col h-screen bg-gray-50 text-gray-900 font-sans">
-      <header className="bg-white border-b border-gray-200 p-4 shadow-sm flex items-center gap-3 sticky top-0 z-10">
-        <div className="bg-blue-600 p-2 rounded-lg text-white">
+      <header className="bg-white border-b border-gray-200 p-4 shadow-sm flex items-center gap-3 sticky top-0 z-10" role="banner">
+        <div className="bg-blue-600 p-2 rounded-lg text-white" aria-hidden="true">
           <Bot size={24} />
         </div>
         <div>
@@ -136,11 +136,11 @@ What agency or organization do you work for?`
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 max-w-3xl mx-auto w-full">
+      <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 max-w-3xl mx-auto w-full" role="main" aria-label="Chat conversation">
         {messages.map(m => (
-          <div key={m.id} className={`flex gap-4 ${m.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+          <div key={m.id} className={`flex gap-4 ${m.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`} role="article" aria-label={`${m.role === 'user' ? 'Your message' : 'Assistant message'}`}>
             <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${m.role === 'user' ? 'bg-gray-800 text-white' : 'bg-blue-600 text-white'
-              }`}>
+              }`} aria-hidden="true">
               {m.role === 'user' ? <User size={16} /> : <Bot size={16} />}
             </div>
 
@@ -160,8 +160,8 @@ What agency or organization do you work for?`
           </div>
         ))}
         {isLoading && (
-          <div className="flex gap-4">
-            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center">
+          <div className="flex gap-4" role="status" aria-live="polite" aria-label="Assistant is typing">
+            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center" aria-hidden="true">
               <Bot size={16} />
             </div>
             <div className="p-4 bg-white border border-blue-100 rounded-2xl rounded-tl-sm shadow-sm">
@@ -170,23 +170,25 @@ What agency or organization do you work for?`
                 <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce delay-75"></div>
                 <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce delay-150"></div>
               </div>
+              <span className="sr-only">Assistant is typing</span>
             </div>
           </div>
         )}
 
         {error && (
-          <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+          <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm" role="alert" aria-live="assertive">
             <span className="font-bold">Error:</span> {error.message}
           </div>
         )}
 
         {assessmentComplete && (
-          <div className="flex justify-center gap-3 my-4">
+          <div className="flex justify-center gap-3 my-4" role="region" aria-label="Assessment complete">
             <button
               onClick={downloadMarkdown}
               className="bg-green-600 text-white px-6 py-3 rounded-xl hover:bg-green-700 transition flex items-center gap-2 font-medium shadow-sm"
+              aria-label="Download assessment report as Markdown file"
             >
-              <Download size={20} />
+              <Download size={20} aria-hidden="true" />
               Download Report (Markdown)
             </button>
           </div>
@@ -195,8 +197,8 @@ What agency or organization do you work for?`
         <div ref={messagesEndRef} />
       </main>
 
-      <footer className="bg-white border-t border-gray-200 p-4 sticky bottom-0 z-10">
-        <form onSubmit={handleSubmit} className="max-w-3xl mx-auto flex gap-2 items-end">
+      <footer className="bg-white border-t border-gray-200 p-4 sticky bottom-0 z-10" role="contentinfo">
+        <form onSubmit={handleSubmit} className="max-w-3xl mx-auto flex gap-2 items-end" aria-label="Send message">
           <textarea
             className="flex-1 p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 resize-none min-h-[48px] max-h-[200px]"
             value={input}
@@ -206,10 +208,14 @@ What agency or organization do you work for?`
                 e.preventDefault();
                 handleSubmit(e);
               }
+              if (e.key === 'Escape') {
+                setInput('');
+              }
             }}
             placeholder="Type your answer..."
             autoFocus
             rows={1}
+            aria-label="Type your answer here. Press Enter to send, Shift+Enter for new line, Escape to clear"
             style={{
               height: 'auto',
               overflowY: input.split('\n').length > 4 ? 'auto' : 'hidden'
@@ -224,8 +230,9 @@ What agency or organization do you work for?`
             type="submit"
             className="bg-blue-600 text-white p-3 rounded-xl hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
             disabled={isLoading || !input?.trim()}
+            aria-label="Send message"
           >
-            <Send size={20} />
+            <Send size={20} aria-hidden="true" />
           </button>
         </form>
       </footer>

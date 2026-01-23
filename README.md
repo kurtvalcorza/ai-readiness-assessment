@@ -93,7 +93,7 @@ ai-readiness-assessment/
 ├── lib/
 │   └── systemPrompt.ts    # AI system prompt & assessment logic
 ├── public/                # Static assets
-├── .env.local.example     # Environment variables template
+├── .env.example           # Environment variables template
 ├── DEPLOYMENT.md          # Deployment guide
 └── package.json           # Dependencies
 ```
