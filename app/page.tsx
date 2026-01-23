@@ -83,6 +83,7 @@ What agency or organization do you work for?`
   };
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const hasSubmittedRef = useRef(false);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
@@ -99,13 +100,14 @@ What agency or organization do you work for?`
         .map(p => p.text)
         .join('') || '';
 
-      if (content.includes('###ASSESSMENT_COMPLETE###')) {
+      if (content.includes('###ASSESSMENT_COMPLETE###') && !hasSubmittedRef.current) {
         setAssessmentComplete(true);
         // Remove the marker from display
         const cleanedContent = content.replace('###ASSESSMENT_COMPLETE###', '').trim();
         setAssessmentReport(cleanedContent);
 
-        // Submit to Google Sheets
+        // Submit to Google Sheets (only once)
+        hasSubmittedRef.current = true;
         submitAssessment(messages, cleanedContent);
       }
     }
