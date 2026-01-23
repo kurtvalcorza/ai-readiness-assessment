@@ -1,6 +1,6 @@
 # AI Readiness Assessment
 
-A self-service chatbot for assessing AI readiness of Philippine government agencies and NGOs, built for DOST-ASTI.
+A self-service chatbot for assessing AI readiness of Philippine government agencies and NGOs.
 
 ## Features
 
@@ -148,8 +148,8 @@ Required:
 
 ## License
 
-Developed for DOST-ASTI
+MIT License
 
 ## Support
 
-For questions or issues, contact the DOST-ASTI team.
+For questions or issues, please open an issue on the repository.
