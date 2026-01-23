@@ -32,5 +32,8 @@
     "eslint-config-next": "16.1.4",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "optionalDependencies": {
+    "@vercel/kv": "^3.0.0"
   }
 }
