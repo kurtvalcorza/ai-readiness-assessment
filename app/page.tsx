@@ -7,11 +7,16 @@ import { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
+// Security constants
+const MAX_INPUT_LENGTH = 2000; // Maximum characters per message
+const MAX_CONVERSATION_HISTORY_SIZE = 50000; // Maximum size for conversation history in bytes
+
 export default function Chat() {
   const [input, setInput] = useState('');
   const [mounted, setMounted] = useState(false);
   const [assessmentComplete, setAssessmentComplete] = useState(false);
   const [assessmentReport, setAssessmentReport] = useState('');
+  const [inputError, setInputError] = useState('');
 
   useEffect(() => {
     setMounted(true);
@@ -48,7 +53,30 @@ What agency or organization do you work for?`
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Prevent submission if assessment is complete
+    if (assessmentComplete) {
+      setInputError('Assessment is complete. Please download your report or start a new assessment.');
+      return;
+    }
+
+    // Validate input
     if (!input.trim()) return;
+
+    // Check input length
+    if (input.length > MAX_INPUT_LENGTH) {
+      setInputError(`Message is too long. Please limit your response to ${MAX_INPUT_LENGTH} characters.`);
+      return;
+    }
+
+    // Basic content validation - prevent extremely repetitive content (potential attack)
+    const uniqueChars = new Set(input.toLowerCase().replace(/\s/g, '')).size;
+    if (uniqueChars < 5 && input.length > 100) {
+      setInputError('Invalid input detected. Please provide a meaningful response.');
+      return;
+    }
+
+    setInputError('');
     const value = input;
     setInput('');
     await sendMessage({ text: value });
@@ -90,14 +118,57 @@ What agency or organization do you work for?`
       const domainMatch = report.match(/\*\*Domain:\*\*\s*(.+)/);
       const readinessMatch = report.match(/\*\*Readiness Level:\*\*\s*(.+)/);
 
+      // Extract solutions from markdown table
+      const solutions: Array<{
+        priority: string;
+        group: string;
+        category: string;
+        fit: string;
+        rationale: string;
+      }> = [];
+
+      // Match the solutions table
+      const tableMatch = report.match(/\| Priority \| Group \| Category \| Fit \| Rationale \|[\s\S]*?\n((?:\|[^\n]+\|\n)+)/);
+      if (tableMatch) {
+        const rows = tableMatch[1].split('\n').filter(row => row.trim() && !row.includes('---'));
+        rows.forEach(row => {
+          const cells = row.split('|').map(cell => cell.trim()).filter(cell => cell);
+          if (cells.length >= 5) {
+            solutions.push({
+              priority: cells[0],
+              group: cells[1],
+              category: cells[2],
+              fit: cells[3],
+              rationale: cells[4]
+            });
+          }
+        });
+      }
+
+      // Extract next steps from numbered list
+      const nextSteps: string[] = [];
+      const nextStepsMatch = report.match(/\*\*Recommended Next Steps:\*\*\s*\n((?:\d+\.\s+.+\n?)+)/);
+      if (nextStepsMatch) {
+        const steps = nextStepsMatch[1].split('\n').filter(line => line.trim());
+        steps.forEach(step => {
+          const stepMatch = step.match(/^\d+\.\s+(.+)$/);
+          if (stepMatch) {
+            nextSteps.push(stepMatch[1].trim());
+          }
+        });
+      }
+
+      // Sanitize conversation history - remove potentially sensitive data and limit size
+      const sanitizedHistory = sanitizeConversationHistory(conversationMessages);
+
       const data = {
         organization: orgMatch?.[1]?.trim() || 'Unknown',
         domain: domainMatch?.[1]?.trim() || 'Unknown',
         readinessLevel: readinessMatch?.[1]?.trim() || 'Unknown',
-        solutions: [],
-        nextSteps: [],
+        solutions,
+        nextSteps,
         timestamp: new Date().toISOString(),
-        conversationHistory: JSON.stringify(conversationMessages)
+        conversationHistory: sanitizedHistory
       };
 
       await fetch('/api/submit', {
@@ -107,6 +178,40 @@ What agency or organization do you work for?`
       });
     } catch (error) {
       console.error('Failed to submit assessment:', error);
+    }
+  };
+
+  // Sanitize conversation history to prevent storing sensitive data
+  const sanitizeConversationHistory = (messages: typeof initialMessages): string => {
+    try {
+      // Create a simplified version of conversation history
+      const simplified = messages.map(msg => ({
+        role: msg.role,
+        content: msg.parts
+          ?.filter(p => p.type === 'text')
+          .map(p => {
+            let text = p.text;
+            // Remove potential PII patterns (basic sanitization)
+            text = text.replace(/\b[\w.%+-]+@[\w.-]+\.[A-Z]{2,}\b/gi, '[EMAIL_REDACTED]');
+            text = text.replace(/\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/g, '[PHONE_REDACTED]');
+            // Truncate very long messages
+            return text.length > 500 ? text.substring(0, 500) + '...[truncated]' : text;
+          })
+          .join('')
+      }));
+
+      const historyJson = JSON.stringify(simplified);
+
+      // If conversation history is too large, truncate it
+      if (historyJson.length > MAX_CONVERSATION_HISTORY_SIZE) {
+        console.warn('Conversation history too large, truncating...');
+        return historyJson.substring(0, MAX_CONVERSATION_HISTORY_SIZE) + '...[truncated]';
+      }
+
+      return historyJson;
+    } catch (error) {
+      console.error('Error sanitizing conversation history:', error);
+      return JSON.stringify([{ role: 'system', content: 'Error sanitizing history' }]);
     }
   };
 
@@ -120,6 +225,11 @@ What agency or organization do you work for?`
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+
+  const startNewAssessment = () => {
+    // Reload the page to start fresh
+    window.location.reload();
   };
 
   if (!mounted) return null;
@@ -182,15 +292,28 @@ What agency or organization do you work for?`
         )}
 
         {assessmentComplete && (
-          <div className="flex justify-center gap-3 my-4" role="region" aria-label="Assessment complete">
-            <button
-              onClick={downloadMarkdown}
-              className="bg-green-600 text-white px-6 py-3 rounded-xl hover:bg-green-700 transition flex items-center gap-2 font-medium shadow-sm"
-              aria-label="Download assessment report as Markdown file"
-            >
-              <Download size={20} aria-hidden="true" />
-              Download Report (Markdown)
-            </button>
+          <div className="space-y-4" role="region" aria-label="Assessment complete">
+            <div className="p-6 bg-green-50 border-2 border-green-300 rounded-xl text-center">
+              <h2 className="text-xl font-bold text-green-800 mb-2">Assessment Complete!</h2>
+              <p className="text-gray-700 mb-4">Your AI readiness assessment has been completed and saved. Download your report below.</p>
+              <div className="flex justify-center gap-3 flex-wrap">
+                <button
+                  onClick={downloadMarkdown}
+                  className="bg-green-600 text-white px-6 py-3 rounded-xl hover:bg-green-700 transition flex items-center gap-2 font-medium shadow-sm"
+                  aria-label="Download assessment report as Markdown file"
+                >
+                  <Download size={20} aria-hidden="true" />
+                  Download Report
+                </button>
+                <button
+                  onClick={startNewAssessment}
+                  className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition flex items-center gap-2 font-medium shadow-sm"
+                  aria-label="Start a new assessment"
+                >
+                  Start New Assessment
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -198,43 +321,68 @@ What agency or organization do you work for?`
       </main>
 
       <footer className="bg-white border-t border-gray-200 p-4 sticky bottom-0 z-10" role="contentinfo">
-        <form onSubmit={handleSubmit} className="max-w-3xl mx-auto flex gap-2 items-end" aria-label="Send message">
-          <textarea
-            className="flex-1 p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 resize-none min-h-[48px] max-h-[200px]"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSubmit(e);
-              }
-              if (e.key === 'Escape') {
-                setInput('');
-              }
-            }}
-            placeholder="Type your answer..."
-            autoFocus
-            rows={1}
-            aria-label="Type your answer here. Press Enter to send, Shift+Enter for new line, Escape to clear"
-            style={{
-              height: 'auto',
-              overflowY: input.split('\n').length > 4 ? 'auto' : 'hidden'
-            }}
-            onInput={(e) => {
-              const target = e.target as HTMLTextAreaElement;
-              target.style.height = 'auto';
-              target.style.height = target.scrollHeight + 'px';
-            }}
-          />
-          <button
-            type="submit"
-            className="bg-blue-600 text-white p-3 rounded-xl hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
-            disabled={isLoading || !input?.trim()}
-            aria-label="Send message"
-          >
-            <Send size={20} aria-hidden="true" />
-          </button>
-        </form>
+        {assessmentComplete ? (
+          <div className="max-w-3xl mx-auto text-center p-4 bg-gray-100 rounded-xl">
+            <p className="text-gray-600 font-medium">
+              Assessment is complete. Please download your report or start a new assessment above.
+            </p>
+          </div>
+        ) : (
+          <div className="max-w-3xl mx-auto space-y-2">
+            {inputError && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm" role="alert">
+                {inputError}
+              </div>
+            )}
+            <form onSubmit={handleSubmit} className="flex gap-2 items-end" aria-label="Send message">
+              <div className="flex-1 relative">
+                <textarea
+                  className="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 resize-none min-h-[48px] max-h-[200px]"
+                  value={input}
+                  onChange={(e) => {
+                    setInput(e.target.value);
+                    setInputError('');
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSubmit(e);
+                    }
+                    if (e.key === 'Escape') {
+                      setInput('');
+                      setInputError('');
+                    }
+                  }}
+                  placeholder="Type your answer..."
+                  autoFocus
+                  rows={1}
+                  maxLength={MAX_INPUT_LENGTH}
+                  aria-label="Type your answer here. Press Enter to send, Shift+Enter for new line, Escape to clear"
+                  style={{
+                    height: 'auto',
+                    overflowY: input.split('\n').length > 4 ? 'auto' : 'hidden'
+                  }}
+                  onInput={(e) => {
+                    const target = e.target as HTMLTextAreaElement;
+                    target.style.height = 'auto';
+                    target.style.height = target.scrollHeight + 'px';
+                  }}
+                />
+                <div className="absolute bottom-1 right-2 text-xs text-gray-400">
+                  {input.length}/{MAX_INPUT_LENGTH}
+                </div>
+              </div>
+              <button
+                type="submit"
+                className="bg-blue-600 text-white p-3 rounded-xl hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+                disabled={isLoading || !input?.trim() || input.length > MAX_INPUT_LENGTH}
+                aria-label="Send message"
+              >
+                <Send size={20} aria-hidden="true" />
+              </button>
+            </form>
+          </div>
+        )}
       </footer>
     </div>
   );
