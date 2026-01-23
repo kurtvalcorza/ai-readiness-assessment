@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd:*)",
+      "Bash(npm run lint)",
+      "Bash(npm run dev:*)",
+      "Bash(curl:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(taskkill /F /PID 169956)",
+      "Bash(taskkill //F //PID 169956)",
+      "Bash(git init:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}
