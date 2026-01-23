@@ -96,3 +96,12 @@ export interface APISuccess {
   success: boolean;
   message: string;
 }
+
+/**
+ * Incoming message from client (can have either parts or content)
+ */
+export interface IncomingMessage {
+  role: 'user' | 'assistant' | 'system';
+  parts?: MessagePart[];
+  content?: string;
+}

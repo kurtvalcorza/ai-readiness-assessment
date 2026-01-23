@@ -33,36 +33,65 @@ export function AssessmentComplete({ report, onStartNew }: AssessmentCompletePro
    * Generates and downloads the report as a PDF
    */
   const downloadPDF = async () => {
+    let root: any = null;
+    let container: HTMLElement | null = null;
+
     try {
       setPdfError('');
 
-      // Dynamically import html2pdf.js (client-side only)
-      const html2pdf = (await import('html2pdf.js')).default;
-      const { default: ReactMarkdown } = await import('react-markdown');
-      const { default: remarkGfm } = await import('remark-gfm');
-      const { createRoot } = await import('react-dom/client');
+      // Dynamically import html2pdf.js (client-side only) with timeout
+      const importPromise = Promise.all([
+        import('html2pdf.js'),
+        import('react-markdown'),
+        import('remark-gfm'),
+        import('react-dom/client'),
+      ]);
+
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('PDF library loading timed out')), 10000)
+      );
+
+      const [html2pdfModule, markdownModule, remarkModule, reactDomModule] = await Promise.race([
+        importPromise,
+        timeoutPromise,
+      ]) as [any, any, any, any];
+
+      const html2pdf = html2pdfModule.default;
+      const ReactMarkdown = markdownModule.default;
+      const remarkGfm = remarkModule.default;
+      const { createRoot } = reactDomModule;
+
+      // Validate report content
+      if (!report || report.trim().length === 0) {
+        throw new Error('Report content is empty');
+      }
 
       // Create container for rendering
-      const container = document.createElement('div');
+      container = document.createElement('div');
       container.style.cssText = `
         padding: 20px;
         font-family: Arial, sans-serif;
         font-size: 12px;
         line-height: 1.6;
         color: #000;
+        max-width: 800px;
       `;
 
       // Create and render React content
-      const root = createRoot(container);
+      root = createRoot(container);
 
-      await new Promise<void>((resolve) => {
-        root.render(
-          <div>
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{report}</ReactMarkdown>
-          </div>
-        );
-        // Give React time to render
-        setTimeout(() => resolve(), 100);
+      await new Promise<void>((resolve, reject) => {
+        try {
+          root.render(
+            <div>
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{report}</ReactMarkdown>
+            </div>
+          );
+          // Give React time to render
+          setTimeout(() => resolve(), 100);
+        } catch (err) {
+          reject(err);
+        }
       });
 
       // Configure PDF options
@@ -70,20 +99,52 @@ export function AssessmentComplete({ report, onStartNew }: AssessmentCompletePro
         margin: [10, 10, 10, 10] as [number, number, number, number],
         filename: `AI-Assessment-${new Date().toISOString().split('T')[0]}.pdf`,
         image: { type: 'jpeg' as const, quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          windowWidth: 800
+        },
         jsPDF: { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const },
       };
 
-      // Generate and download PDF
-      await html2pdf().set(options).from(container).save();
+      // Generate and download PDF with timeout
+      const pdfPromise = html2pdf().set(options).from(container).save();
+      const pdfTimeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('PDF generation timed out')), 30000)
+      );
+
+      await Promise.race([pdfPromise, pdfTimeoutPromise]);
 
       // Cleanup
-      root.unmount();
+      if (root) {
+        root.unmount();
+      }
     } catch (error) {
       console.error('Error generating PDF:', error);
-      setPdfError(
-        'Failed to generate PDF. Please try downloading the Markdown version instead.'
-      );
+
+      let errorMessage = 'Failed to generate PDF. ';
+      if (error instanceof Error) {
+        if (error.message.includes('timeout') || error.message.includes('timed out')) {
+          errorMessage += 'The operation took too long. ';
+        } else if (error.message.includes('empty')) {
+          errorMessage += 'The report content is invalid. ';
+        } else {
+          errorMessage += `${error.message}. `;
+        }
+      }
+      errorMessage += 'Please try downloading the Markdown version instead.';
+
+      setPdfError(errorMessage);
+
+      // Cleanup on error
+      if (root) {
+        try {
+          root.unmount();
+        } catch (cleanupError) {
+          console.error('Error during cleanup:', cleanupError);
+        }
+      }
     }
   };
 

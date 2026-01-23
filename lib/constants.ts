@@ -19,6 +19,7 @@ export const MAX_SUBMISSIONS_PER_WINDOW = 5; // 5 submissions per 5 minutes
 // Content validation
 export const MIN_UNIQUE_CHARS = 5; // Minimum unique characters for spam detection
 export const MIN_LENGTH_FOR_SPAM_CHECK = 100; // Minimum message length to trigger spam check
+export const BLOCK_PROMPT_INJECTION = true; // Block requests with detected prompt injection attempts
 
 /**
  * Regex patterns for PII detection and sanitization
