@@ -132,7 +132,7 @@ What agency or organization do you work for?`
         </div>
         <div>
           <h1 className="text-xl font-bold text-gray-800">AI Readiness Assessment</h1>
-          <p className="text-xs text-gray-500">DOST-ASTI • Self-Service Tool</p>
+          <p className="text-xs text-gray-500">Self-Service Assessment Tool</p>
         </div>
       </header>
 

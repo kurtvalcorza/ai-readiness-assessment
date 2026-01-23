@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AI Readiness Assessment | DOST-ASTI",
+  title: "AI Readiness Assessment",
   description: "Self-service chatbot for assessing your organization's AI readiness and discovering AI solutions tailored to Philippine government agencies and NGOs.",
 };
 
