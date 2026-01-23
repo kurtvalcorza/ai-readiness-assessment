@@ -1,11 +1,14 @@
 import { google } from '@ai-sdk/google';
 import { streamText } from 'ai';
 import { systemPrompt } from '@/lib/systemPrompt';
+import { validateEnv } from '@/lib/env';
 
 export const maxDuration = 30;
 
 export async function POST(req: Request) {
     try {
+        // Validate environment variables
+        validateEnv();
         const body = await req.json();
         const { messages } = body;
 
