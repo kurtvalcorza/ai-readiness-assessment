@@ -2,7 +2,7 @@
 
 import { useChat, UIMessage } from '@ai-sdk/react';
 import { TextStreamChatTransport } from 'ai';
-import { Send, Bot, User, Download } from 'lucide-react';
+import { Send, Bot, User, Download, FileText } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -229,6 +229,59 @@ What agency or organization do you work for?`
     URL.revokeObjectURL(url);
   };
 
+  const downloadPDF = async () => {
+    try {
+      // Dynamically import html2pdf.js (client-side only)
+      const html2pdf = (await import('html2pdf.js')).default;
+
+      // Convert markdown to HTML
+      const container = document.createElement('div');
+      container.style.padding = '20px';
+      container.style.fontFamily = 'Arial, sans-serif';
+      container.style.fontSize = '12px';
+      container.style.lineHeight = '1.6';
+      container.style.color = '#000';
+
+      // Create a temporary React root to render markdown
+      const ReactMarkdown = (await import('react-markdown')).default;
+      const remarkGfm = (await import('remark-gfm')).default;
+      const { createRoot } = await import('react-dom/client');
+
+      const root = createRoot(container);
+
+      // Render and wait for it to complete
+      await new Promise<void>((resolve) => {
+        root.render(
+          <div>
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {assessmentReport}
+            </ReactMarkdown>
+          </div>
+        );
+        // Give React time to render
+        setTimeout(() => resolve(), 100);
+      });
+
+      // Configure PDF options
+      const options = {
+        margin: [10, 10, 10, 10] as [number, number, number, number],
+        filename: `AI-Assessment-${new Date().toISOString().split('T')[0]}.pdf`,
+        image: { type: 'jpeg' as const, quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const }
+      };
+
+      // Generate and download PDF
+      await html2pdf().set(options).from(container).save();
+
+      // Cleanup
+      root.unmount();
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Failed to generate PDF. Please try downloading the Markdown version instead.');
+    }
+  };
+
   const startNewAssessment = () => {
     // Reload the page to start fresh
     window.location.reload();
@@ -305,7 +358,15 @@ What agency or organization do you work for?`
                   aria-label="Download assessment report as Markdown file"
                 >
                   <Download size={20} aria-hidden="true" />
-                  Download Report
+                  Download MD
+                </button>
+                <button
+                  onClick={downloadPDF}
+                  className="bg-green-600 text-white px-6 py-3 rounded-xl hover:bg-green-700 transition flex items-center gap-2 font-medium shadow-sm"
+                  aria-label="Download assessment report as PDF file"
+                >
+                  <FileText size={20} aria-hidden="true" />
+                  Download PDF
                 </button>
                 <button
                   onClick={startNewAssessment}
