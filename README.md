@@ -4,22 +4,28 @@ A self-service chatbot for assessing AI readiness of Philippine government agenc
 
 ## Features
 
-- **Interactive Assessment**: 12-question guided interview
+- **Interactive Assessment**: 12-question guided interview across 6 key areas
 - **AI-Powered**: Uses Google's Gemini 2.5 Flash for intelligent conversations
-- **Automatic Report Generation**: Creates customized assessment reports
+- **Automatic Report Generation**: Creates customized assessment reports with readiness levels
+- **Multiple Download Formats**: Markdown and HTML reports with print-to-PDF capability
 - **Session Management**: Conversations automatically end after report generation
 - **Data Collection**: Automatically saves responses to Google Sheets with full solution details
-- **Download Reports**: Users can download their assessment as Markdown
-- **Security Guardrails**: Input validation, rate limiting, and PII redaction
-- **Responsive Design**: Works on desktop and mobile devices
+- **Security Guardrails**: Comprehensive input validation, rate limiting, and PII redaction
+- **Error Handling**: React error boundaries with graceful fallback UI
+- **Responsive Design**: Works seamlessly on desktop and mobile devices
+- **Accessibility**: WCAG 2.1 compliant with full keyboard navigation
+- **Production Ready**: Comprehensive testing suite and security headers
 
 ## Tech Stack
 
-- **Frontend**: Next.js 16.1.4, React 19.2, Tailwind CSS
-- **AI**: Google Generative AI (Gemini 2.5 Flash)
-- **UI Components**: Lucide React icons, ReactMarkdown
-- **Deployment**: Vercel
-- **Data Storage**: Google Sheets via Apps Script
+- **Frontend**: Next.js 15+ with App Router, React 19, TypeScript
+- **Styling**: Tailwind CSS with responsive design
+- **AI**: Google Generative AI (Gemini 2.5 Flash) with streaming responses
+- **UI Components**: Lucide React icons, ReactMarkdown, custom components
+- **Testing**: Vitest with React Testing Library
+- **Security**: Content Security Policy, rate limiting, input validation
+- **Deployment**: Vercel with optional Vercel KV for distributed rate limiting
+- **Data Storage**: Google Sheets via Apps Script webhook
 
 ## Quick Start
 
@@ -85,7 +91,7 @@ function doPost(e) {
 
 ### Deployment
 
-See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed deployment instructions or [QUICKSTART-DEPLOYMENT.md](./QUICKSTART-DEPLOYMENT.md) for a 10-minute quick start guide.
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed deployment instructions.
 
 ## Project Structure
 
@@ -95,15 +101,33 @@ ai-readiness-assessment/
 │   ├── api/
 │   │   ├── chat/          # Chat API endpoint with AI streaming
 │   │   └── submit/        # Submission API for Google Sheets
-│   ├── layout.tsx         # Root layout
+│   ├── layout.tsx         # Root layout with error boundaries
 │   ├── page.tsx           # Main chat interface
 │   └── globals.css        # Global styles
+├── components/
+│   ├── AssessmentComplete.tsx  # Completion screen with downloads
+│   ├── ChatHeader.tsx         # Header component
+│   ├── ChatInput.tsx          # Input with validation
+│   ├── ChatMessage.tsx        # Message display
+│   ├── ErrorAlert.tsx         # Error notifications
+│   ├── ErrorBoundary.tsx      # Error boundary components
+│   └── LoadingIndicator.tsx   # Loading animation
 ├── lib/
-│   └── systemPrompt.ts    # AI system prompt & assessment logic
-├── public/                # Static assets
-├── .env.example           # Environment variables template
-├── DEPLOYMENT.md          # Deployment guide
-└── package.json           # Dependencies
+│   ├── constants.ts       # Application constants
+│   ├── env.ts            # Environment validation
+│   ├── rate-limit.ts     # Rate limiting (Vercel KV + in-memory)
+│   ├── report-parser.ts  # Assessment report parsing
+│   ├── systemPrompt.ts   # AI system prompt & assessment logic
+│   ├── types.ts          # TypeScript definitions
+│   ├── utils.ts          # Utility functions
+│   └── validation.ts     # Security and data validation
+├── tests/                # Comprehensive test suite
+├── public/               # Static assets
+├── .env.example          # Environment variables template
+├── DEPLOYMENT.md         # Deployment guide
+├── DEVELOPMENT.md        # Developer setup guide
+├── SECURITY.md           # Security guidelines
+└── package.json          # Dependencies
 ```
 
 ## How It Works
@@ -149,23 +173,41 @@ For detailed security information, see [SECURITY.md](./SECURITY.md)
 
 ## Environment Variables
 
-Required:
+**Required:**
 - `GOOGLE_GENERATIVE_AI_API_KEY` - Google AI API key
-- `GOOGLE_SHEETS_WEBHOOK_URL` - Google Apps Script webhook URL (optional, for data collection)
+
+**Optional (for enhanced features):**
+- `GOOGLE_SHEETS_WEBHOOK_URL` - Google Apps Script webhook URL (for data collection)
+- `KV_REST_API_URL` - Vercel KV URL (for distributed rate limiting in production)
+- `KV_REST_API_TOKEN` - Vercel KV token (for distributed rate limiting in production)
+
+**Development vs Production:**
+- Development: Uses in-memory rate limiting
+- Production: Automatically uses Vercel KV if configured, falls back to in-memory
 
 ## Available Scripts
 
 - `npm run dev` - Start development server
-- `npm run build` - Build for production
+- `npm run build` - Build for production  
 - `npm run start` - Start production server
 - `npm run lint` - Run ESLint
+- `npm test` - Run test suite
+- `npm run test:watch` - Run tests in watch mode
+- `npm run test:ui` - Run tests with UI
+- `npm run test:coverage` - Generate coverage report
 
 ## Key Files
 
-- `app/page.tsx` - Main chat interface component with TextStreamChatTransport
-- `app/api/chat/route.ts` - Chat API handler with AI streaming
+- `app/page.tsx` - Main chat interface with error boundaries
+- `app/api/chat/route.ts` - Chat API handler with AI streaming and rate limiting
 - `app/api/submit/route.ts` - Submission handler for Google Sheets integration
-- `lib/systemPrompt.ts` - AI system prompt with questionnaire logic and rules
+- `components/` - Modular React components with TypeScript
+- `lib/systemPrompt.ts` - AI system prompt with questionnaire logic
+- `lib/validation.ts` - Security validation and PII redaction
+- `lib/rate-limit.ts` - Production-ready rate limiting (Vercel KV + in-memory)
+- `lib/types.ts` - Comprehensive TypeScript type definitions
+- `tests/` - Complete test suite for components and API routes
+- `middleware.ts` - Security headers and Content Security Policy
 
 ## Contributing
 
