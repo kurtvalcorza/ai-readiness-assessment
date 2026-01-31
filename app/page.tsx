@@ -2,7 +2,7 @@
 
 import { useChat } from '@ai-sdk/react';
 import { TextStreamChatTransport } from 'ai';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { ChatHeader } from '@/components/ChatHeader';
 import { ChatMessage } from '@/components/ChatMessage';
 import { LoadingIndicator } from '@/components/LoadingIndicator';
@@ -13,6 +13,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ChatErrorBoundary } from '@/components/ChatErrorBoundary';
 import { UIMessage, AssessmentData } from '@/lib/types';
 import { sanitizeConversationHistory } from '@/lib/validation';
+import { debounce, smoothScrollToElement } from '@/lib/utils';
 import {
   parseAssessmentReport,
   isAssessmentComplete,
@@ -49,6 +50,8 @@ export default function Chat() {
   const [assessmentComplete, setAssessmentComplete] = useState(false);
   const [assessmentReport, setAssessmentReport] = useState('');
   const [submissionError, setSubmissionError] = useState('');
+  const [loadingState, setLoadingState] = useState<'idle' | 'connecting' | 'streaming' | 'error'>('idle');
+  const [requestTimeout, setRequestTimeout] = useState<NodeJS.Timeout | null>(null);
   const hasSubmittedRef = useRef(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -59,19 +62,57 @@ export default function Chat() {
   const { messages, status, sendMessage, error } = useChat({
     transport: new TextStreamChatTransport({ api: '/api/chat' }),
     messages: INITIAL_MESSAGES,
+    onStart: () => {
+      setLoadingState('connecting');
+      // Set timeout for stuck requests
+      const timeoutId = setTimeout(() => {
+        if (loadingState === 'connecting') {
+          setSubmissionError('Request is taking longer than expected. Please try again.');
+          setLoadingState('error');
+        }
+      }, 30000); // 30 second timeout
+      setRequestTimeout(timeoutId);
+    },
+    onStream: () => {
+      setLoadingState('streaming');
+      if (requestTimeout) {
+        clearTimeout(requestTimeout);
+        setRequestTimeout(null);
+      }
+    },
+    onFinish: () => {
+      setLoadingState('idle');
+      if (requestTimeout) {
+        clearTimeout(requestTimeout);
+        setRequestTimeout(null);
+      }
+    },
     onError: (error) => {
       console.error('Chat error:', error);
+      setLoadingState('error');
+      if (requestTimeout) {
+        clearTimeout(requestTimeout);
+        setRequestTimeout(null);
+      }
     },
   });
 
-  const isLoading = status === 'streaming' || status === 'submitted';
+  const isLoading = loadingState === 'connecting' || loadingState === 'streaming';
 
   /**
    * Scrolls to the bottom of the chat
    */
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
-  };
+  const scrollToBottom = useCallback(() => {
+    smoothScrollToElement(messagesEndRef.current, 'smooth');
+  }, []);
+
+  /**
+   * Debounced scroll for streaming updates
+   */
+  const debouncedScroll = useCallback(
+    debounce(scrollToBottom, 100),
+    [scrollToBottom]
+  );
 
   /**
    * Submits assessment data to the backend
@@ -115,11 +156,20 @@ export default function Chat() {
   };
 
   /**
+   * Handles scrolling based on loading state
+   */
+  useEffect(() => {
+    if (loadingState === 'streaming') {
+      debouncedScroll();
+    } else {
+      scrollToBottom();
+    }
+  }, [messages, loadingState, scrollToBottom, debouncedScroll]);
+
+  /**
    * Checks for assessment completion and triggers submission
    */
   useEffect(() => {
-    scrollToBottom();
-
     const lastMessage = messages[messages.length - 1];
     if (lastMessage?.role === 'assistant') {
       const content = lastMessage.parts
@@ -140,9 +190,21 @@ export default function Chat() {
   }, [messages]);
 
   /**
+   * Cleanup timeout on unmount
+   */
+  useEffect(() => {
+    return () => {
+      if (requestTimeout) {
+        clearTimeout(requestTimeout);
+      }
+    };
+  }, [requestTimeout]);
+
+  /**
    * Handles message submission from chat input
    */
   const handleSendMessage = async (text: string) => {
+    setSubmissionError(''); // Clear any previous errors
     await sendMessage({ text });
   };
 
@@ -152,7 +214,13 @@ export default function Chat() {
   const handleStartNewAssessment = () => {
     setAssessmentComplete(false);
     setAssessmentReport('');
+    setSubmissionError('');
+    setLoadingState('idle');
     hasSubmittedRef.current = false;
+    if (requestTimeout) {
+      clearTimeout(requestTimeout);
+      setRequestTimeout(null);
+    }
     // Reload to get fresh state
     window.location.reload();
   };
@@ -175,7 +243,11 @@ export default function Chat() {
               <ChatMessage key={m.id} message={m} />
             ))}
 
-            {isLoading && <LoadingIndicator />}
+            {isLoading && (
+              <LoadingIndicator 
+                state={loadingState === 'connecting' ? 'connecting' : 'streaming'} 
+              />
+            )}
 
             {error && <ErrorAlert message={`Error: ${error.message}`} severity="error" />}
 
@@ -232,6 +304,7 @@ export default function Chat() {
                 onSubmit={handleSendMessage}
                 isLoading={isLoading}
                 disabled={assessmentComplete}
+                loadingState={loadingState === 'connecting' ? 'connecting' : 'streaming'}
               />
             </ErrorBoundary>
           )}

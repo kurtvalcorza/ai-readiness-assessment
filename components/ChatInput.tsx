@@ -12,9 +12,10 @@ interface ChatInputProps {
   onSubmit: (message: string) => Promise<void>;
   isLoading: boolean;
   disabled?: boolean;
+  loadingState?: 'connecting' | 'streaming';
 }
 
-export function ChatInput({ onSubmit, isLoading, disabled = false }: ChatInputProps) {
+export function ChatInput({ onSubmit, isLoading, disabled = false, loadingState }: ChatInputProps) {
   const [input, setInput] = useState('');
   const [inputError, setInputError] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -72,22 +73,51 @@ export function ChatInput({ onSubmit, isLoading, disabled = false }: ChatInputPr
 
   const isDisabled = isLoading || disabled || !input?.trim() || input.length > MAX_INPUT_LENGTH;
 
+  const getPlaceholder = () => {
+    if (isLoading) {
+      return loadingState === 'connecting' ? 'Connecting...' : 'Waiting for response...';
+    }
+    return 'Type your answer...';
+  };
+
+  const getLoadingMessage = () => {
+    if (loadingState === 'connecting') {
+      return 'Connecting to assistant...';
+    }
+    return 'Waiting for response...';
+  };
+
   return (
     <div className="max-w-3xl mx-auto space-y-2">
       {inputError && <ErrorAlert message={inputError} onClose={() => setInputError('')} />}
+      
+      {/* Loading indicator for input area */}
+      {isLoading && (
+        <div className="text-center text-sm text-gray-500 py-2">
+          <span className="inline-flex items-center space-x-2">
+            <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin" />
+            <span>{getLoadingMessage()}</span>
+          </span>
+        </div>
+      )}
+      
       <form onSubmit={handleSubmit} className="flex gap-2 items-end" aria-label="Send message">
         <div className="flex-1 relative">
           <textarea
             ref={textareaRef}
-            className="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 resize-none min-h-[48px] max-h-[200px]"
+            className={`w-full p-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none min-h-[48px] max-h-[200px] transition-colors duration-200 ${
+              isLoading 
+                ? 'bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed' 
+                : 'bg-gray-50 border-gray-300'
+            }`}
             value={input}
             onChange={handleChange}
             onKeyDown={handleKeyDown}
-            placeholder="Type your answer..."
-            autoFocus
+            placeholder={getPlaceholder()}
+            autoFocus={!isLoading}
             rows={1}
             maxLength={MAX_INPUT_LENGTH}
-            disabled={disabled}
+            disabled={disabled || isLoading}
             aria-label="Type your answer here. Press Enter to send, Shift+Enter for new line, Escape to clear"
             style={{
               overflowY: input.split('\n').length > 4 ? 'auto' : 'hidden',
@@ -99,11 +129,19 @@ export function ChatInput({ onSubmit, isLoading, disabled = false }: ChatInputPr
         </div>
         <button
           type="submit"
-          className="bg-blue-600 text-white p-3 rounded-xl hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+          className={`p-3 rounded-xl transition-all duration-200 flex-shrink-0 ${
+            isDisabled 
+              ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+              : 'bg-blue-600 text-white hover:bg-blue-700'
+          }`}
           disabled={isDisabled}
           aria-label="Send message"
         >
-          <Send size={20} aria-hidden="true" />
+          {isLoading ? (
+            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <Send size={20} aria-hidden="true" />
+          )}
         </button>
       </form>
     </div>
