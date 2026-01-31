@@ -1,5 +1,8 @@
 /**
  * Next.js middleware for security headers
+ * 
+ * Note: This app is designed to be embedded as an iframe in the ACABAI-PH website,
+ * so frame-ancestors CSP directive allows embedding from trusted domains.
  */
 
 import { NextResponse } from 'next/server';
@@ -9,7 +12,7 @@ export function middleware(request: NextRequest) {
   // Create response
   const response = NextResponse.next();
 
-  // Content Security Policy
+  // Content Security Policy - Allow iframe embedding from trusted domains
   const cspHeader = `
     default-src 'self';
     script-src 'self' 'unsafe-eval' 'unsafe-inline' https://va.vercel-scripts.com https://vitals.vercel-insights.com;
@@ -19,15 +22,15 @@ export function middleware(request: NextRequest) {
     object-src 'none';
     base-uri 'self';
     form-action 'self';
-    frame-ancestors 'none';
+    frame-ancestors 'self' https://*.vercel.app https://*.netlify.app https://*.github.io https://*.pages.dev https://localhost:* http://localhost:*;
     connect-src 'self' https://generativelanguage.googleapis.com https://script.google.com https://va.vercel-scripts.com https://vitals.vercel-insights.com;
     worker-src 'self' blob:;
   `.replace(/\s{2,}/g, ' ').trim();
 
-  // Security headers
+  // Security headers - Remove X-Frame-Options to allow CSP frame-ancestors to control framing
   response.headers.set('Content-Security-Policy', cspHeader);
   response.headers.set('Referrer-Policy', 'origin-when-cross-origin');
-  response.headers.set('X-Frame-Options', 'DENY');
+  // Removed X-Frame-Options to let CSP frame-ancestors handle iframe embedding
   response.headers.set('X-Content-Type-Options', 'nosniff');
   response.headers.set('X-DNS-Prefetch-Control', 'false');
   response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
