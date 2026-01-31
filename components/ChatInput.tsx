@@ -12,10 +12,9 @@ interface ChatInputProps {
   onSubmit: (message: string) => Promise<void>;
   isLoading: boolean;
   disabled?: boolean;
-  loadingState?: 'connecting' | 'streaming';
 }
 
-export function ChatInput({ onSubmit, isLoading, disabled = false, loadingState }: ChatInputProps) {
+export function ChatInput({ onSubmit, isLoading, disabled = false }: ChatInputProps) {
   const [input, setInput] = useState('');
   const [inputError, setInputError] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -75,15 +74,12 @@ export function ChatInput({ onSubmit, isLoading, disabled = false, loadingState 
 
   const getPlaceholder = () => {
     if (isLoading) {
-      return loadingState === 'connecting' ? 'Connecting...' : 'Waiting for response...';
+      return 'Waiting for response...';
     }
     return 'Type your answer...';
   };
 
   const getLoadingMessage = () => {
-    if (loadingState === 'connecting') {
-      return 'Connecting to assistant...';
-    }
     return 'Waiting for response...';
   };
 

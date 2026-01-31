@@ -62,31 +62,6 @@ export default function Chat() {
   const { messages, status, sendMessage, error } = useChat({
     transport: new TextStreamChatTransport({ api: '/api/chat' }),
     messages: INITIAL_MESSAGES,
-    onStart: () => {
-      setLoadingState('connecting');
-      // Set timeout for stuck requests
-      const timeoutId = setTimeout(() => {
-        if (loadingState === 'connecting') {
-          setSubmissionError('Request is taking longer than expected. Please try again.');
-          setLoadingState('error');
-        }
-      }, 30000); // 30 second timeout
-      setRequestTimeout(timeoutId);
-    },
-    onStream: () => {
-      setLoadingState('streaming');
-      if (requestTimeout) {
-        clearTimeout(requestTimeout);
-        setRequestTimeout(null);
-      }
-    },
-    onFinish: () => {
-      setLoadingState('idle');
-      if (requestTimeout) {
-        clearTimeout(requestTimeout);
-        setRequestTimeout(null);
-      }
-    },
     onError: (error) => {
       console.error('Chat error:', error);
       setLoadingState('error');
@@ -96,6 +71,40 @@ export default function Chat() {
       }
     },
   });
+
+  /**
+   * Effect to manage loading states based on useChat status
+   */
+  useEffect(() => {
+    if (status === 'submitted') {
+      setLoadingState('connecting');
+      // Set timeout for stuck requests
+      const timeoutId = setTimeout(() => {
+        setSubmissionError('Request is taking longer than expected. Please try again.');
+        setLoadingState('error');
+      }, 30000); // 30 second timeout
+      setRequestTimeout(timeoutId);
+    } else if (status === 'streaming') {
+      setLoadingState('streaming');
+      if (requestTimeout) {
+        clearTimeout(requestTimeout);
+        setRequestTimeout(null);
+      }
+    } else if (status === 'idle') {
+      setLoadingState('idle');
+      if (requestTimeout) {
+        clearTimeout(requestTimeout);
+        setRequestTimeout(null);
+      }
+    }
+    
+    // Cleanup function
+    return () => {
+      if (requestTimeout) {
+        clearTimeout(requestTimeout);
+      }
+    };
+  }, [status]);
 
   const isLoading = loadingState === 'connecting' || loadingState === 'streaming';
 
@@ -304,7 +313,6 @@ export default function Chat() {
                 onSubmit={handleSendMessage}
                 isLoading={isLoading}
                 disabled={assessmentComplete}
-                loadingState={loadingState === 'connecting' ? 'connecting' : 'streaming'}
               />
             </ErrorBoundary>
           )}
