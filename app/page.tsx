@@ -50,7 +50,7 @@ export default function Chat() {
   const [assessmentComplete, setAssessmentComplete] = useState(false);
   const [assessmentReport, setAssessmentReport] = useState('');
   const [submissionError, setSubmissionError] = useState('');
-  const [loadingState, setLoadingState] = useState<'idle' | 'connecting' | 'streaming' | 'error'>('idle');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [requestTimeout, setRequestTimeout] = useState<NodeJS.Timeout | null>(null);
   const hasSubmittedRef = useRef(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -64,7 +64,7 @@ export default function Chat() {
     messages: INITIAL_MESSAGES,
     onError: (error) => {
       console.error('Chat error:', error);
-      setLoadingState('error');
+      setIsSubmitting(false);
       if (requestTimeout) {
         clearTimeout(requestTimeout);
         setRequestTimeout(null);
@@ -73,40 +73,30 @@ export default function Chat() {
   });
 
   /**
-   * Effect to manage loading states based on useChat status
+   * Effect to detect when streaming completes
    */
   useEffect(() => {
-    if (status === 'submitted') {
-      setLoadingState('connecting');
-      // Set timeout for stuck requests
-      const timeoutId = setTimeout(() => {
-        setSubmissionError('Request is taking longer than expected. Please try again.');
-        setLoadingState('error');
-      }, 30000); // 30 second timeout
-      setRequestTimeout(timeoutId);
-    } else if (status === 'streaming') {
-      setLoadingState('streaming');
-      if (requestTimeout) {
-        clearTimeout(requestTimeout);
-        setRequestTimeout(null);
-      }
-    } else if (status === 'idle') {
-      setLoadingState('idle');
+    if (isSubmitting && status === 'ready') {
+      setIsSubmitting(false);
       if (requestTimeout) {
         clearTimeout(requestTimeout);
         setRequestTimeout(null);
       }
     }
-    
-    // Cleanup function
+  }, [status, isSubmitting, requestTimeout]);
+
+  /**
+   * Cleanup timeout on unmount
+   */
+  useEffect(() => {
     return () => {
       if (requestTimeout) {
         clearTimeout(requestTimeout);
       }
     };
-  }, [status]);
+  }, [requestTimeout]);
 
-  const isLoading = loadingState === 'connecting' || loadingState === 'streaming';
+  const isLoading = isSubmitting;
 
   /**
    * Scrolls to the bottom of the chat
@@ -214,7 +204,24 @@ export default function Chat() {
    */
   const handleSendMessage = async (text: string) => {
     setSubmissionError(''); // Clear any previous errors
-    await sendMessage({ text });
+    setIsSubmitting(true);
+    
+    // Set timeout for stuck requests
+    const timeoutId = setTimeout(() => {
+      setSubmissionError('Request is taking longer than expected. Please try again.');
+      setIsSubmitting(false);
+    }, 30000); // 30 second timeout
+    setRequestTimeout(timeoutId);
+    
+    try {
+      await sendMessage({ text });
+    } catch (error) {
+      setIsSubmitting(false);
+      if (requestTimeout) {
+        clearTimeout(requestTimeout);
+        setRequestTimeout(null);
+      }
+    }
   };
 
   /**
@@ -224,7 +231,7 @@ export default function Chat() {
     setAssessmentComplete(false);
     setAssessmentReport('');
     setSubmissionError('');
-    setLoadingState('idle');
+    setIsSubmitting(false);
     hasSubmittedRef.current = false;
     if (requestTimeout) {
       clearTimeout(requestTimeout);
@@ -252,11 +259,7 @@ export default function Chat() {
               <ChatMessage key={m.id} message={m} />
             ))}
 
-            {isLoading && (
-              <LoadingIndicator 
-                state={loadingState === 'connecting' ? 'connecting' : 'streaming'} 
-              />
-            )}
+            {isLoading && <LoadingIndicator />}
 
             {error && <ErrorAlert message={`Error: ${error.message}`} severity="error" />}
 
