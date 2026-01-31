@@ -28,6 +28,8 @@ export async function POST(req: Request): Promise<Response> {
         headers: {
           'Content-Type': 'application/json',
           'Retry-After': '300',
+          'X-Content-Type-Options': 'nosniff',
+          'X-Frame-Options': 'DENY',
         },
       });
     }
@@ -45,7 +47,11 @@ export async function POST(req: Request): Promise<Response> {
       const error: APIError = { error: 'Field values exceed maximum length' };
       return new Response(JSON.stringify(error), {
         status: 400,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Content-Type-Options': 'nosniff',
+          'X-Frame-Options': 'DENY',
+        },
       });
     }
 
@@ -61,7 +67,11 @@ export async function POST(req: Request): Promise<Response> {
       };
       return new Response(JSON.stringify(success), {
         status: 200,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Content-Type-Options': 'nosniff',
+          'X-Frame-Options': 'DENY',
+        },
       });
     }
 
@@ -96,14 +106,22 @@ export async function POST(req: Request): Promise<Response> {
     };
     return new Response(JSON.stringify(success), {
       status: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'X-Content-Type-Options': 'nosniff',
+        'X-Frame-Options': 'DENY',
+      },
     });
   } catch (error: any) {
     console.error('Submit API error:', error);
     const apiError: APIError = { error: error.message || 'Submission failed' };
     return new Response(JSON.stringify(apiError), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'X-Content-Type-Options': 'nosniff',
+        'X-Frame-Options': 'DENY',
+      },
     });
   }
 }

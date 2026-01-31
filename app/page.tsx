@@ -9,6 +9,8 @@ import { LoadingIndicator } from '@/components/LoadingIndicator';
 import { ChatInput } from '@/components/ChatInput';
 import { AssessmentComplete } from '@/components/AssessmentComplete';
 import { ErrorAlert } from '@/components/ErrorAlert';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { ChatErrorBoundary } from '@/components/ChatErrorBoundary';
 import { UIMessage, AssessmentData } from '@/lib/types';
 import { sanitizeConversationHistory } from '@/lib/validation';
 import {
@@ -159,58 +161,82 @@ export default function Chat() {
   if (!mounted) return null;
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50 text-gray-900 font-sans">
-      <ChatHeader />
+    <ErrorBoundary>
+      <div className="flex flex-col h-screen bg-gray-50 text-gray-900 font-sans">
+        <ChatHeader />
 
-      <main
-        className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 max-w-3xl mx-auto w-full"
-        role="main"
-        aria-label="Chat conversation"
-      >
-        {messages.map((m) => (
-          <ChatMessage key={m.id} message={m} />
-        ))}
+        <ChatErrorBoundary onReset={handleStartNewAssessment}>
+          <main
+            className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 max-w-3xl mx-auto w-full"
+            role="main"
+            aria-label="Chat conversation"
+          >
+            {messages.map((m) => (
+              <ChatMessage key={m.id} message={m} />
+            ))}
 
-        {isLoading && <LoadingIndicator />}
+            {isLoading && <LoadingIndicator />}
 
-        {error && <ErrorAlert message={`Error: ${error.message}`} severity="error" />}
+            {error && <ErrorAlert message={`Error: ${error.message}`} severity="error" />}
 
-        {submissionError && (
-          <ErrorAlert
-            message={submissionError}
-            severity="warning"
-            onClose={() => setSubmissionError('')}
-          />
-        )}
+            {submissionError && (
+              <ErrorAlert
+                message={submissionError}
+                severity="warning"
+                onClose={() => setSubmissionError('')}
+              />
+            )}
 
-        {assessmentComplete && (
-          <AssessmentComplete
-            report={assessmentReport}
-            onStartNew={handleStartNewAssessment}
-          />
-        )}
+            {assessmentComplete && (
+              <ErrorBoundary
+                fallback={
+                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
+                    <p className="text-yellow-800">
+                      Error loading assessment completion. Please refresh the page.
+                    </p>
+                  </div>
+                }
+              >
+                <AssessmentComplete
+                  report={assessmentReport}
+                  onStartNew={handleStartNewAssessment}
+                />
+              </ErrorBoundary>
+            )}
 
-        <div ref={messagesEndRef} />
-      </main>
+            <div ref={messagesEndRef} />
+          </main>
+        </ChatErrorBoundary>
 
-      <footer
-        className="bg-white border-t border-gray-200 p-4 sticky bottom-0 z-10"
-        role="contentinfo"
-      >
-        {assessmentComplete ? (
-          <div className="max-w-3xl mx-auto text-center p-4 bg-gray-100 rounded-xl">
-            <p className="text-gray-600 font-medium">
-              Assessment is complete. Please download your report or start a new assessment above.
-            </p>
-          </div>
-        ) : (
-          <ChatInput
-            onSubmit={handleSendMessage}
-            isLoading={isLoading}
-            disabled={assessmentComplete}
-          />
-        )}
-      </footer>
-    </div>
+        <footer
+          className="bg-white border-t border-gray-200 p-4 sticky bottom-0 z-10"
+          role="contentinfo"
+        >
+          {assessmentComplete ? (
+            <div className="max-w-3xl mx-auto text-center p-4 bg-gray-100 rounded-xl">
+              <p className="text-gray-600 font-medium">
+                Assessment is complete. Please download your report or start a new assessment above.
+              </p>
+            </div>
+          ) : (
+            <ErrorBoundary
+              fallback={
+                <div className="max-w-3xl mx-auto text-center p-4 bg-red-50 border border-red-200 rounded-xl">
+                  <p className="text-red-600">
+                    Chat input error. Please refresh the page to continue.
+                  </p>
+                </div>
+              }
+            >
+              <ChatInput
+                onSubmit={handleSendMessage}
+                isLoading={isLoading}
+                disabled={assessmentComplete}
+              />
+            </ErrorBoundary>
+          )}
+        </footer>
+      </div>
+    </ErrorBoundary>
   );
 }

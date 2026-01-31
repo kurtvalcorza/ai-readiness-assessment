@@ -34,6 +34,8 @@ export async function POST(req: Request) {
             'Content-Type': 'application/json',
             'X-RateLimit-Remaining': '0',
             'Retry-After': '60',
+            'X-Content-Type-Options': 'nosniff',
+            'X-Frame-Options': 'DENY',
           },
         }
       );
@@ -115,7 +117,14 @@ export async function POST(req: Request) {
 
     return new Response(
       JSON.stringify({ error: error.message || 'An internal error occurred.' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+      { 
+        status: 500, 
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Content-Type-Options': 'nosniff',
+          'X-Frame-Options': 'DENY',
+        } 
+      }
     );
   }
 }
