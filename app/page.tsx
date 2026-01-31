@@ -158,12 +158,12 @@ export default function Chat() {
    * Handles scrolling based on loading state
    */
   useEffect(() => {
-    if (loadingState === 'streaming') {
+    if (isSubmitting) {
       debouncedScroll();
     } else {
       scrollToBottom();
     }
-  }, [messages, loadingState, scrollToBottom, debouncedScroll]);
+  }, [messages, isSubmitting, scrollToBottom, debouncedScroll]);
 
   /**
    * Checks for assessment completion and triggers submission
