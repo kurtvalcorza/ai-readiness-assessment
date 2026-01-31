@@ -93,7 +93,7 @@ export function AssessmentComplete({ report, onStartNew }: AssessmentCompletePro
    * Simple markdown to HTML converter
    */
   const convertMarkdownToHTML = (markdown: string): string => {
-    return markdown
+    let html = markdown
       .replace(/^# (.*$)/gim, '<h1>$1</h1>')
       .replace(/^## (.*$)/gim, '<h2>$1</h2>')
       .replace(/^### (.*$)/gim, '<h3>$1</h3>')
@@ -102,13 +102,28 @@ export function AssessmentComplete({ report, onStartNew }: AssessmentCompletePro
       .replace(/\*(.*?)\*/gim, '<em>$1</em>')
       .replace(/^\* (.*$)/gim, '<li>$1</li>')
       .replace(/^\d+\. (.*$)/gim, '<li>$1</li>')
-      .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
-      .replace(/\n\n/gim, '</p><p>')
-      .replace(/^(?!<[h|u|l])/gim, '<p>')
-      .replace(/(?<![>])$/gim, '</p>')
-      .replace(/<p><\/p>/gim, '')
-      .replace(/<p>(<[h|u])/gim, '$1')
-      .replace(/(<\/[h|u|l][^>]*>)<\/p>/gim, '$1');
+      .replace(/\n\n/gim, '</p><p>');
+
+    // Wrap consecutive list items in ul tags
+    html = html.replace(/(<li>.*?<\/li>(\n<li>.*?<\/li>)*)/g, '<ul>$1</ul>');
+    
+    // Add paragraph tags
+    html = html.split('\n').map(line => {
+      if (line.trim() === '') return '';
+      if (line.match(/^<[h1-6]|^<ul|^<\/ul/)) return line;
+      if (line.match(/^<li/)) return line;
+      return line.startsWith('<') ? line : `<p>${line}</p>`;
+    }).join('\n');
+
+    // Clean up empty paragraphs and fix nesting
+    html = html
+      .replace(/<p><\/p>/g, '')
+      .replace(/<p>(<[h1-6])/g, '$1')
+      .replace(/(<\/[h1-6][^>]*>)<\/p>/g, '$1')
+      .replace(/<p>(<ul)/g, '$1')
+      .replace(/(<\/ul>)<\/p>/g, '$1');
+
+    return html;
   };
 
   /**
