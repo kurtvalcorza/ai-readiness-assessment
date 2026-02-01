@@ -21,6 +21,13 @@ export const maxDuration = 30;
  */
 export async function POST(req: Request) {
   try {
+    // Debug environment variables (remove after fixing)
+    console.log('Environment check:', {
+      hasGoogleKey: !!process.env.GOOGLE_GENERATIVE_AI_API_KEY,
+      keyLength: process.env.GOOGLE_GENERATIVE_AI_API_KEY?.length || 0,
+      allEnvKeys: Object.keys(process.env).filter(key => key.includes('GOOGLE')),
+    });
+
     // Rate limiting check
     const rateLimit = await checkChatRateLimit(req);
     if (!rateLimit.allowed) {
