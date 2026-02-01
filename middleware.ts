@@ -22,7 +22,7 @@ export function middleware(request: NextRequest) {
     object-src 'none';
     base-uri 'self';
     form-action 'self';
-    frame-ancestors 'self' https://*.vercel.app https://*.netlify.app https://*.github.io https://*.pages.dev https://*.amplifyapp.com https://localhost:* http://localhost:*;
+    frame-ancestors 'self' https://*.vercel.app https://*.netlify.app https://*.github.io https://*.pages.dev https://*.amplifyapp.com https://kurt.valcorza.com https://localhost:* http://localhost:*;
     connect-src 'self' https://generativelanguage.googleapis.com https://script.google.com https://va.vercel-scripts.com https://vitals.vercel-insights.com;
     worker-src 'self' blob:;
   `.replace(/\s{2,}/g, ' ').trim();
