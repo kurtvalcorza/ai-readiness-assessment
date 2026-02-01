@@ -6,6 +6,9 @@ frontend:
         - npm install
     build:
       commands:
+        # Inject environment variables into .env file for Next.js runtime
+        - echo "GOOGLE_GENERATIVE_AI_API_KEY=$GOOGLE_GENERATIVE_AI_API_KEY" >> .env
+        - echo "GOOGLE_SHEETS_WEBHOOK_URL=$GOOGLE_SHEETS_WEBHOOK_URL" >> .env
         - npm run build
   artifacts:
     baseDirectory: .next
