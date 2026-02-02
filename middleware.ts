@@ -39,7 +39,7 @@ export function middleware(request: NextRequest) {
   // Build CSP based on environment
   const scriptSrc = isDev
     ? "'self' 'unsafe-eval' 'unsafe-inline' https://va.vercel-scripts.com https://vitals.vercel-insights.com"
-    : `'self' 'nonce-${nonce}' https://va.vercel-scripts.com https://vitals.vercel-insights.com`;
+    : `'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com https://vitals.vercel-insights.com`;
 
   // Tightened img-src: removed wildcard https:, only allow specific domains
   const imgSrc = "'self' blob: data: https://fonts.gstatic.com";
