@@ -44,15 +44,14 @@ The application implements multiple layers of security controls at both the fron
 - **Development Mode**: Relaxed CSP for hot reload and dev tools
   - Allows `'unsafe-eval'` and `'unsafe-inline'` for development
   - Wildcard domains for testing
-- **Production Mode**: Hardened CSP with nonce support
-  - Requires `'unsafe-inline'` for Next.js framework scripts (Next.js 16 limitation)
-  - Nonce-based protection for custom inline scripts
+- **Production Mode**: Hardened CSP (with Next.js 16 limitations)
+  - Requires `'unsafe-inline'` and `'unsafe-eval'` for Next.js framework scripts
   - Specific domains only (no wildcards)
 
 ### CSP Directives (Production)
 ```
 default-src 'self';
-script-src 'self' 'unsafe-inline' 'nonce-{random}' https://va.vercel-scripts.com https://vitals.vercel-insights.com;
+script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com https://vitals.vercel-insights.com;
 style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
 img-src 'self' blob: data: https://fonts.gstatic.com;
 font-src 'self' https://fonts.gstatic.com;
@@ -67,7 +66,7 @@ block-all-mixed-content;
 report-uri /api/csp-report;
 ```
 
-**Note**: Next.js 16 requires `'unsafe-inline'` for framework scripts when using middleware-based CSP. The nonce provides additional protection for custom inline scripts. This is a known limitation of the middleware approach.
+**Note**: Next.js 16 requires both `'unsafe-inline'` and `'unsafe-eval'` for framework scripts when using middleware-based CSP. This is a known limitation of the middleware approach in Next.js 16.
 
 ### Nonce-Based Script Execution
 - Unique cryptographic nonce generated per request

@@ -37,11 +37,11 @@ export function middleware(request: NextRequest) {
   });
 
   // Build CSP based on environment
-  // Note: Next.js 16 requires 'unsafe-inline' for framework scripts in production
+  // Note: Next.js 16 requires 'unsafe-inline' and 'unsafe-eval' for framework scripts in production
   // The nonce provides additional protection for custom inline scripts
   const scriptSrc = isDev
     ? "'self' 'unsafe-eval' 'unsafe-inline' https://va.vercel-scripts.com https://vitals.vercel-insights.com"
-    : `'self' 'unsafe-inline' 'nonce-${nonce}' https://va.vercel-scripts.com https://vitals.vercel-insights.com`;
+    : `'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com https://vitals.vercel-insights.com`;
 
   // Tightened img-src: removed wildcard https:, only allow specific domains
   const imgSrc = "'self' blob: data: https://fonts.gstatic.com";
