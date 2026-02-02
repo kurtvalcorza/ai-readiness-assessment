@@ -3,38 +3,81 @@
  * 
  * Note: This app is designed to be embedded as an iframe in the ACABAI-PH website,
  * so frame-ancestors CSP directive allows embedding from trusted domains.
+ * 
+ * CSP Configuration:
+ * - Development: Relaxed CSP for hot reload and dev tools
+ * - Production: Strict CSP with nonce-based inline scripts
  */
 
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-export function middleware(request: NextRequest) {
-  // Create response
-  const response = NextResponse.next();
+/**
+ * Generates a cryptographically secure nonce for CSP
+ */
+function generateNonce(): string {
+  const array = new Uint8Array(16);
+  crypto.getRandomValues(array);
+  return Buffer.from(array).toString('base64');
+}
 
-  // Content Security Policy - Allow iframe embedding from trusted domains
+export function middleware(request: NextRequest) {
+  const isDev = process.env.NODE_ENV === 'development';
+  const nonce = generateNonce();
+
+  // Store nonce in request headers for use in pages
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-nonce', nonce);
+
+  const response = NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  });
+
+  // Build CSP based on environment
+  const scriptSrc = isDev
+    ? "'self' 'unsafe-eval' 'unsafe-inline' https://va.vercel-scripts.com https://vitals.vercel-insights.com"
+    : `'self' 'nonce-${nonce}' https://va.vercel-scripts.com https://vitals.vercel-insights.com`;
+
+  // Tightened img-src: removed wildcard https:, only allow specific domains
+  const imgSrc = "'self' blob: data: https://fonts.gstatic.com";
+
+  // Tightened frame-ancestors: specific domains only (no wildcards in production)
+  const frameAncestors = isDev
+    ? "'self' https://*.vercel.app https://*.netlify.app https://*.github.io https://*.pages.dev https://*.amplifyapp.com https://kurt.valcorza.com https://localhost:* http://localhost:*"
+    : "'self' https://acabai-ph.vercel.app https://kurt.valcorza.com";
+
+  // Content Security Policy
   const cspHeader = `
     default-src 'self';
-    script-src 'self' 'unsafe-eval' 'unsafe-inline' https://va.vercel-scripts.com https://vitals.vercel-insights.com;
+    script-src ${scriptSrc};
     style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
-    img-src 'self' blob: data: https:;
+    img-src ${imgSrc};
     font-src 'self' https://fonts.gstatic.com;
     object-src 'none';
     base-uri 'self';
     form-action 'self';
-    frame-ancestors 'self' https://*.vercel.app https://*.netlify.app https://*.github.io https://*.pages.dev https://*.amplifyapp.com https://kurt.valcorza.com https://localhost:* http://localhost:*;
+    frame-ancestors ${frameAncestors};
     connect-src 'self' https://generativelanguage.googleapis.com https://script.google.com https://va.vercel-scripts.com https://vitals.vercel-insights.com;
     worker-src 'self' blob:;
+    upgrade-insecure-requests;
+    block-all-mixed-content;
+    report-uri /api/csp-report;
   `.replace(/\s{2,}/g, ' ').trim();
 
-  // Security headers - Remove X-Frame-Options to allow CSP frame-ancestors to control framing
+  // Set security headers
   response.headers.set('Content-Security-Policy', cspHeader);
-  response.headers.set('Referrer-Policy', 'origin-when-cross-origin');
-  // Removed X-Frame-Options to let CSP frame-ancestors handle iframe embedding
+  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   response.headers.set('X-Content-Type-Options', 'nosniff');
   response.headers.set('X-DNS-Prefetch-Control', 'false');
-  response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-  response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+  response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), interest-cohort=()');
+  
+  // Store nonce in response header for debugging (optional, remove in production if needed)
+  if (isDev) {
+    response.headers.set('X-CSP-Nonce', nonce);
+  }
 
   return response;
 }

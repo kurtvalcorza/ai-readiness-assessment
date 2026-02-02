@@ -11,9 +11,11 @@ import { AssessmentComplete } from '@/components/AssessmentComplete';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ChatErrorBoundary } from '@/components/ChatErrorBoundary';
+import { ConsentBanner } from '@/components/ConsentBanner';
 import { UIMessage, AssessmentData } from '@/lib/types';
 import { sanitizeConversationHistory } from '@/lib/validation';
 import { debounce, smoothScrollToElement } from '@/lib/utils';
+import { setConsent, hasConsentChoice, hasAcceptedConsent } from '@/lib/consent';
 import {
   parseAssessmentReport,
   isAssessmentComplete,
@@ -52,11 +54,16 @@ export default function Chat() {
   const [submissionError, setSubmissionError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [requestTimeout, setRequestTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [showConsentBanner, setShowConsentBanner] = useState(false);
   const hasSubmittedRef = useRef(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setMounted(true);
+    // Check if user has already made a consent choice
+    if (!hasConsentChoice()) {
+      setShowConsentBanner(true);
+    }
   }, []);
 
   const { messages, status, sendMessage, error } = useChat({
@@ -133,6 +140,16 @@ export default function Chat() {
         timestamp: new Date().toISOString(),
         conversationHistory: sanitizedHistory,
       };
+
+      // Check consent before submitting to Google Sheets
+      if (!hasAcceptedConsent()) {
+        console.log('User declined consent - skipping Google Sheets submission');
+        setSubmissionError(
+          'Assessment complete! Your data was not saved per your privacy preference. ' +
+          'You can still download your report below.'
+        );
+        return;
+      }
 
       const response = await fetch('/api/submit', {
         method: 'POST',
@@ -241,6 +258,22 @@ export default function Chat() {
     window.location.reload();
   };
 
+  /**
+   * Handles user accepting consent
+   */
+  const handleAcceptConsent = () => {
+    setConsent(true);
+    setShowConsentBanner(false);
+  };
+
+  /**
+   * Handles user declining consent
+   */
+  const handleDeclineConsent = () => {
+    setConsent(false);
+    setShowConsentBanner(false);
+  };
+
   // Don't render until mounted (prevents hydration issues)
   if (!mounted) return null;
 
@@ -320,6 +353,14 @@ export default function Chat() {
             </ErrorBoundary>
           )}
         </footer>
+
+        {/* Consent Banner */}
+        {showConsentBanner && (
+          <ConsentBanner
+            onAccept={handleAcceptConsent}
+            onDecline={handleDeclineConsent}
+          />
+        )}
       </div>
     </ErrorBoundary>
   );

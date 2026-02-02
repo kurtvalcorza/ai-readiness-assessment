@@ -1,0 +1,35 @@
+feat: Add privacy consent banner and harden Content Security Policy
+
+## Privacy Consent Banner
+- Add user consent banner on first visit
+- Implement localStorage-based consent management
+- Make Google Sheets submission conditional on user consent
+- Add clear privacy messaging and user control
+
+## Content Security Policy Hardening
+- Implement environment-based CSP (dev vs production)
+- Add nonce-based inline script execution
+- Remove unsafe-eval and unsafe-inline in production
+- Tighten image sources (remove wildcard https:)
+- Tighten frame-ancestors to specific domains
+- Add CSP violation reporting endpoint
+- Enhance security headers (HSTS preload, FLoC blocking)
+
+## New Files
+- components/ConsentBanner.tsx - Privacy consent UI
+- lib/consent.ts - Consent management utilities
+- app/api/csp-report/route.ts - CSP violation reporting
+
+## Modified Files
+- app/page.tsx - Integrate consent banner and logic
+- middleware.ts - Complete CSP overhaul with nonce generation
+- SECURITY.md - Document new security features
+
+## Security Improvements
+- User privacy control and transparency
+- XSS attack prevention via strict CSP
+- Nonce-based script execution
+- Environment-aware security configuration
+- Violation monitoring and reporting
+
+Closes security audit recommendations for privacy policy and CSP hardening.

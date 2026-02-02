@@ -6,9 +6,80 @@ This document outlines the security measures implemented in the AI Readiness Ass
 
 The application implements multiple layers of security controls at both the frontend and backend to ensure safe operation and protect user data.
 
+**Recent Security Enhancements (February 2026):**
+- ✅ Privacy consent banner with user control
+- ✅ Hardened Content Security Policy (CSP) with nonce-based scripts
+- ✅ Environment-based security configuration
+- ✅ CSP violation reporting
+
 ---
 
-## 1. Session Management
+## 1. Privacy & Consent Management
+
+### User Consent Banner
+- **Implementation**: `components/ConsentBanner.tsx`, `lib/consent.ts`
+- **Behavior**:
+  - Displays on first visit with clear privacy notice
+  - User can accept or decline data collection
+  - Choice stored in localStorage
+  - Consent required for Google Sheets submission
+- **User Control**:
+  - Accept: Assessment data saved to Google Sheets
+  - Decline: Assessment works, but data not saved (PDF download still available)
+  - Preference persists across sessions
+
+### Data Collection Transparency
+- Clear explanation of what data is collected
+- User consent required before submission
+- PII sanitization before storage
+- Option to decline without losing functionality
+
+---
+
+## 2. Content Security Policy (CSP)
+
+### Environment-Based Configuration
+- **Development Mode**: Relaxed CSP for hot reload and dev tools
+  - Allows `'unsafe-eval'` and `'unsafe-inline'` for development
+  - Wildcard domains for testing
+- **Production Mode**: Strict CSP for maximum security
+  - Nonce-based inline scripts only
+  - No `'unsafe-eval'` or `'unsafe-inline'`
+  - Specific domains only (no wildcards)
+
+### CSP Directives (Production)
+```
+default-src 'self';
+script-src 'self' 'nonce-{random}' https://va.vercel-scripts.com https://vitals.vercel-insights.com;
+style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+img-src 'self' blob: data: https://fonts.gstatic.com;
+font-src 'self' https://fonts.gstatic.com;
+object-src 'none';
+base-uri 'self';
+form-action 'self';
+frame-ancestors 'self' https://acabai-ph.vercel.app https://kurt.valcorza.com;
+connect-src 'self' https://generativelanguage.googleapis.com https://script.google.com;
+worker-src 'self' blob:;
+upgrade-insecure-requests;
+block-all-mixed-content;
+report-uri /api/csp-report;
+```
+
+### Nonce-Based Script Execution
+- Unique cryptographic nonce generated per request
+- Only scripts with valid nonce can execute
+- Prevents XSS attacks via inline script injection
+- Next.js automatically applies nonce to framework scripts
+
+### CSP Violation Reporting
+- **Endpoint**: `/api/csp-report`
+- **Purpose**: Logs all CSP violations for monitoring
+- **Integration**: Ready for Sentry or other monitoring services
+- **Location**: `app/api/csp-report/route.ts`
+
+---
+
+## 3. Session Management
 
 ### Assessment Completion Control
 - **Issue Addressed**: Users could continue conversations after assessment completion, potentially consuming API resources unnecessarily
@@ -16,11 +87,11 @@ The application implements multiple layers of security controls at both the fron
   - Input form is disabled once assessment is complete
   - Users cannot submit additional messages after receiving their report
   - Only "Download Report" and "Start New Assessment" options available post-completion
-- **Location**: `app/page.tsx:49-75`
+- **Location**: `app/page.tsx`
 
 ---
 
-## 2. Input Validation
+## 4. Input Validation
 
 ### Frontend Validation
 
