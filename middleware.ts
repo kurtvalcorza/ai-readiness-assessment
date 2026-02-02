@@ -18,7 +18,8 @@ import type { NextRequest } from 'next/server';
 function generateNonce(): string {
   const array = new Uint8Array(16);
   crypto.getRandomValues(array);
-  return Buffer.from(array).toString('base64');
+  // Convert to base64 without using Buffer (Edge runtime compatible)
+  return btoa(String.fromCharCode(...array));
 }
 
 export function middleware(request: NextRequest) {
