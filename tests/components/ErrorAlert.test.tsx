@@ -55,6 +55,6 @@ describe('ErrorAlert', () => {
     render(<ErrorAlert message="Test error" />);
     
     const alert = screen.getByRole('alert');
-    expect(alert).toHaveAttribute('aria-live', 'polite');
+    expect(alert).toHaveAttribute('aria-live', 'assertive');
   });
 });

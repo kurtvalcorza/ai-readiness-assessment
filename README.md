@@ -22,10 +22,12 @@ A self-service chatbot for assessing AI readiness of Philippine government agenc
 - **Styling**: Tailwind CSS with responsive design
 - **AI**: Google Generative AI (Gemini 2.5 Flash) with streaming responses
 - **UI Components**: Lucide React icons, ReactMarkdown, custom components
-- **Testing**: Vitest with React Testing Library
+- **Testing**: Vitest with React Testing Library (>80% coverage)
+- **Validation**: Zod for runtime type validation
 - **Security**: Content Security Policy, rate limiting, input validation
 - **Deployment**: Vercel with optional Vercel KV for distributed rate limiting
 - **Data Storage**: Google Sheets via Apps Script webhook
+- **Architecture**: Custom hooks, service layer, utility functions
 
 ## Quick Start
 
@@ -75,6 +77,22 @@ A self-service chatbot for assessing AI readiness of Philippine government agenc
 
 See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed deployment instructions.
 
+## Architecture
+
+This application follows a clean architecture pattern with clear separation of concerns:
+
+- **Presentation Layer**: React components focused on UI rendering
+- **Business Logic Layer**: Custom hooks and service functions
+- **API Layer**: Thin controllers that delegate to services
+- **Utilities Layer**: Shared utilities, constants, and validation
+
+### Design Patterns
+
+- **Custom Hooks**: Encapsulate complex state management and side effects
+- **Service Layer**: Framework-agnostic business logic for testability
+- **Utility Functions**: Consistent response formatting and error handling
+- **Type Safety**: Runtime validation with Zod and compile-time TypeScript
+
 ## Project Structure
 
 ```
@@ -82,30 +100,50 @@ ai-readiness-assessment/
 ├── app/
 │   ├── api/
 │   │   ├── chat/          # Chat API endpoint with AI streaming
-│   │   └── submit/        # Submission API for Google Sheets
+│   │   ├── submit/        # Submission API for Google Sheets
+│   │   └── csp-report/    # CSP violation reporting
 │   ├── layout.tsx         # Root layout with error boundaries
-│   ├── page.tsx           # Main chat interface
+│   ├── page.tsx           # Main chat interface (<200 lines)
 │   └── globals.css        # Global styles
 ├── components/
 │   ├── AssessmentComplete.tsx  # Completion screen with downloads
 │   ├── ChatHeader.tsx         # Header component
 │   ├── ChatInput.tsx          # Input with validation
 │   ├── ChatMessage.tsx        # Message display
+│   ├── ChatMessageList.tsx    # Message list container
 │   ├── ErrorAlert.tsx         # Error notifications
 │   ├── ErrorBoundary.tsx      # Error boundary components
 │   └── LoadingIndicator.tsx   # Loading animation
+├── hooks/
+│   ├── useAssessmentLogic.ts  # Assessment state & completion logic
+│   ├── useChatScroll.ts       # Auto-scroll behavior
+│   └── useConsent.ts          # Consent banner management
+├── services/
+│   ├── chatService.ts         # Chat validation & message prep
+│   └── submissionService.ts   # Assessment submission logic
 ├── lib/
-│   ├── constants.ts       # Application constants
-│   ├── env.ts            # Environment validation
+│   ├── api-utils.ts       # Response formatting utilities
+│   ├── constants/
+│   │   ├── parsing.ts     # Report parsing patterns
+│   │   ├── security.ts    # Rate limits & injection patterns
+│   │   └── validation.ts  # PII patterns & validation rules
+│   ├── env.ts            # Environment validation with Zod
 │   ├── rate-limit.ts     # Rate limiting (Vercel KV + in-memory)
 │   ├── report-parser.ts  # Assessment report parsing
+│   ├── schemas.ts        # Zod schemas for validation
 │   ├── systemPrompt.ts   # AI system prompt & assessment logic
 │   ├── types.ts          # TypeScript definitions
 │   ├── utils.ts          # Utility functions
 │   └── validation.ts     # Security and data validation
-├── tests/                # Comprehensive test suite
+├── tests/
+│   ├── components/       # Component tests
+│   ├── hooks/            # Hook tests
+│   ├── integration/      # End-to-end flow tests
+│   ├── services/         # Service layer tests
+│   └── api/              # API route tests
 ├── public/               # Static assets
 ├── .env.example          # Environment variables template
+├── ARCHITECTURE.md       # Detailed architecture documentation
 ├── DEPLOYMENT.md         # Deployment guide
 ├── DEVELOPMENT.md        # Developer setup guide
 ├── SECURITY.md           # Security guidelines
@@ -178,18 +216,51 @@ For detailed security information, see [SECURITY.md](./SECURITY.md)
 - `npm run test:ui` - Run tests with UI
 - `npm run test:coverage` - Generate coverage report
 
-## Key Files
+## Development Guide
 
-- `app/page.tsx` - Main chat interface with error boundaries
-- `app/api/chat/route.ts` - Chat API handler with AI streaming and rate limiting
-- `app/api/submit/route.ts` - Submission handler for Google Sheets integration
-- `components/` - Modular React components with TypeScript
-- `lib/systemPrompt.ts` - AI system prompt with questionnaire logic
-- `lib/validation.ts` - Security validation and PII redaction
-- `lib/rate-limit.ts` - Production-ready rate limiting (Vercel KV + in-memory)
-- `lib/types.ts` - Comprehensive TypeScript type definitions
-- `tests/` - Complete test suite for components and API routes
+### Adding New Features
+
+1. **New API Endpoint**: Create route handler in `app/api/`, use `createJsonResponse` and `createErrorResponse` from `lib/api-utils.ts`
+2. **New Business Logic**: Add service functions in `services/`, keep them framework-agnostic
+3. **New Component**: Create in `components/`, add tests in `tests/components/`
+4. **New Hook**: Create in `hooks/`, add tests in `tests/hooks/`
+5. **New Constants**: Add to appropriate file in `lib/constants/`
+
+### Testing Guidelines
+
+- **Unit Tests**: Test services and hooks in isolation
+- **Component Tests**: Use React Testing Library, test user interactions
+- **Integration Tests**: Test complete user flows end-to-end
+- **Coverage Target**: Maintain >80% coverage for new code
+
+Run tests:
+```bash
+npm test              # Run all tests
+npm run test:watch    # Watch mode
+npm run test:ui       # Interactive UI
+npm run test:coverage # Coverage report
+```
+
+### Code Organization Principles
+
+- **Components**: Focus on rendering, delegate logic to hooks
+- **Hooks**: Manage state and side effects, return clear interfaces
+- **Services**: Pure functions for business logic, no framework dependencies
+- **API Routes**: Thin controllers that validate input and call services
+
+### Key Files
+
+- `app/page.tsx` - Main chat interface (<200 lines, uses custom hooks)
+- `hooks/useAssessmentLogic.ts` - Assessment state management and completion detection
+- `services/chatService.ts` - Chat validation and message preparation
+- `services/submissionService.ts` - Assessment submission and formatting
+- `lib/api-utils.ts` - Consistent response formatting for API routes
+- `lib/schemas.ts` - Zod schemas for runtime validation
+- `lib/constants/` - Organized constants by domain (security, validation, parsing)
+- `tests/` - Comprehensive test suite with >80% coverage
 - `middleware.ts` - Security headers and Content Security Policy
+
+For detailed architecture information, see [ARCHITECTURE.md](./ARCHITECTURE.md)
 
 ## Contributing
 

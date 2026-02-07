@@ -135,7 +135,7 @@ describe('/api/chat', () => {
     });
 
     const response = await POST(request);
-    expect(response.status).toBe(500);
+    expect(response.status).toBe(400); // Changed from 500 to 400 - it's a validation error
 
     const data = await response.json();
     expect(data.error).toContain('security risk');

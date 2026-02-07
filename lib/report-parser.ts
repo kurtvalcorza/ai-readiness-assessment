@@ -7,6 +7,7 @@ import {
   NEXT_STEPS_PATTERN,
   ASSESSMENT_COMPLETE_MARKER,
 } from './constants';
+import { PARSING } from './constants/parsing';
 import { AISolution } from './types';
 
 /**
@@ -21,27 +22,48 @@ export interface ParsedReport {
 }
 
 /**
+ * Configuration for pattern-based extraction
+ */
+interface PatternConfig {
+  patterns: readonly RegExp[];
+  validator?: (value: string) => boolean;
+  fallback: string;
+  fieldName: string;
+}
+
+/**
+ * Generic helper function for extracting fields using multiple patterns
+ * @param report - The assessment report text
+ * @param config - Pattern configuration
+ * @returns Extracted value or fallback
+ */
+function extractWithPatterns(report: string, config: PatternConfig): string {
+  for (const pattern of config.patterns) {
+    const match = report.match(pattern);
+    if (match?.[1]?.trim()) {
+      const value = match[1].trim();
+      // Apply validator if provided
+      if (!config.validator || config.validator(value)) {
+        return value;
+      }
+    }
+  }
+
+  console.warn(`Could not extract ${config.fieldName} from report`);
+  return config.fallback;
+}
+
+/**
  * Extracts organization name from report
  * @param report - The assessment report text
  * @returns Organization name or 'Unknown'
  */
 export function extractOrganization(report: string): string {
-  // Try multiple patterns for robustness
-  const patterns = [
-    /\*\*Organization:\*\*\s*(.+)/,
-    /Organization:\s*(.+)/,
-    /\*\*Organization\*\*:\s*(.+)/,
-  ];
-
-  for (const pattern of patterns) {
-    const match = report.match(pattern);
-    if (match?.[1]?.trim()) {
-      return match[1].trim();
-    }
-  }
-
-  console.warn('Could not extract organization from report');
-  return 'Unknown Organization';
+  return extractWithPatterns(report, {
+    patterns: PARSING.PATTERNS.ORGANIZATION,
+    fallback: 'Unknown Organization',
+    fieldName: 'organization',
+  });
 }
 
 /**
@@ -50,22 +72,11 @@ export function extractOrganization(report: string): string {
  * @returns Domain or 'Unknown'
  */
 export function extractDomain(report: string): string {
-  // Try multiple patterns for robustness
-  const patterns = [
-    /\*\*Domain:\*\*\s*(.+)/,
-    /Domain:\s*(.+)/,
-    /\*\*Domain\*\*:\s*(.+)/,
-  ];
-
-  for (const pattern of patterns) {
-    const match = report.match(pattern);
-    if (match?.[1]?.trim()) {
-      return match[1].trim();
-    }
-  }
-
-  console.warn('Could not extract domain from report');
-  return 'Unknown Domain';
+  return extractWithPatterns(report, {
+    patterns: PARSING.PATTERNS.DOMAIN,
+    fallback: 'Unknown Domain',
+    fieldName: 'domain',
+  });
 }
 
 /**
@@ -74,27 +85,15 @@ export function extractDomain(report: string): string {
  * @returns Readiness level or 'Unknown'
  */
 export function extractReadinessLevel(report: string): string {
-  // Try multiple patterns for robustness
-  const patterns = [
-    /\*\*Readiness Level:\*\*\s*(.+)/,
-    /Readiness Level:\s*(.+)/,
-    /\*\*Readiness Level\*\*:\s*(.+)/,
-  ];
-
-  for (const pattern of patterns) {
-    const match = report.match(pattern);
-    if (match?.[1]?.trim()) {
-      const level = match[1].trim();
-      // Validate it's a known level
-      const validLevels = ['High', 'Medium', 'Low'];
-      if (validLevels.some((v) => level.toLowerCase().includes(v.toLowerCase()))) {
-        return level;
-      }
-    }
-  }
-
-  console.warn('Could not extract readiness level from report');
-  return 'Unknown';
+  return extractWithPatterns(report, {
+    patterns: PARSING.PATTERNS.READINESS_LEVEL,
+    validator: (value) =>
+      PARSING.VALID_LEVELS.some((level) =>
+        value.toLowerCase().includes(level.toLowerCase())
+      ),
+    fallback: 'Unknown',
+    fieldName: 'readiness level',
+  });
 }
 
 /**
