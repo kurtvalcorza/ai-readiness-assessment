@@ -7,7 +7,7 @@ import { Bot } from 'lucide-react';
 export function ChatHeader() {
   return (
     <header
-      className="bg-white border-b border-gray-200 p-4 shadow-sm flex items-center gap-3 sticky top-0 z-10"
+      className="bg-white border-b border-gray-200 p-4 shadow-sm flex items-center gap-3 z-10"
       role="banner"
     >
       <div className="bg-blue-600 p-2 rounded-lg text-white" aria-hidden="true">

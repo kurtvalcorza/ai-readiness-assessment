@@ -102,7 +102,7 @@ export default function Chat() {
         </ChatErrorBoundary>
 
         <footer
-          className="bg-white border-t border-gray-200 p-4 sticky bottom-0 z-10"
+          className="bg-white border-t border-gray-200 p-4 z-10"
           role="contentinfo"
         >
           {assessmentState.isComplete ? (

@@ -62,7 +62,7 @@ export function ChatMessageList({
 }: ChatMessageListProps) {
   return (
     <main
-      className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 max-w-3xl mx-auto w-full"
+      className="flex-1 overflow-y-auto min-h-0 p-4 md:p-6 space-y-6 max-w-3xl mx-auto w-full"
       role="main"
       aria-label="Chat conversation"
     >
