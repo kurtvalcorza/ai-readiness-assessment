@@ -23,35 +23,14 @@ describe('AssessmentComplete', () => {
 
   const mockOnStartNew = vi.fn();
 
-  // Mock DOM APIs
-  let mockCreateElement: any;
-  let mockCreateObjectURL: any;
-  let mockRevokeObjectURL: any;
-  let mockWindowOpen: any;
+  let mockWindowOpen: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     mockOnStartNew.mockClear();
 
-    // Mock document.createElement for download links
-    const originalCreateElement = document.createElement.bind(document);
-    mockCreateElement = vi.spyOn(document, 'createElement').mockImplementation((tagName: string) => {
-      if (tagName === 'a') {
-        const anchor = originalCreateElement('a');
-        anchor.click = vi.fn();
-        return anchor;
-      }
-      return originalCreateElement(tagName);
-    });
-
-    // Mock URL.createObjectURL and revokeObjectURL
-    mockCreateObjectURL = vi.fn(() => 'blob:mock-url');
-    mockRevokeObjectURL = vi.fn();
-    global.URL.createObjectURL = mockCreateObjectURL;
-    global.URL.revokeObjectURL = mockRevokeObjectURL;
-
     // Mock window.open
     mockWindowOpen = vi.fn();
-    global.window.open = mockWindowOpen;
+    vi.stubGlobal('open', mockWindowOpen);
   });
 
   afterEach(() => {
@@ -66,12 +45,15 @@ describe('AssessmentComplete', () => {
       expect(screen.getByText(/Your AI readiness assessment has been completed/)).toBeInTheDocument();
     });
 
-    it('renders all download buttons', () => {
+    it('renders exactly two action buttons (HTML Preview and Print to PDF)', () => {
       render(<AssessmentComplete report={mockReport} onStartNew={mockOnStartNew} />);
 
-      expect(screen.getByRole('button', { name: /Download assessment report as Markdown/i })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /Download assessment report as HTML/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Preview assessment report as styled HTML in new tab/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /Generate PDF version/i })).toBeInTheDocument();
+
+      // Verify no Markdown or HTML download buttons exist
+      expect(screen.queryByRole('button', { name: /Download assessment report as Markdown/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /Download assessment report as HTML/i })).not.toBeInTheDocument();
     });
 
     it('renders start new assessment button', () => {
@@ -80,114 +62,72 @@ describe('AssessmentComplete', () => {
       expect(screen.getByRole('button', { name: /Start a new assessment/i })).toBeInTheDocument();
     });
 
-    it('renders download options info', () => {
+    it('renders help text describing HTML Preview and Print to PDF only', () => {
       render(<AssessmentComplete report={mockReport} onStartNew={mockOnStartNew} />);
 
       expect(screen.getByText('Download Options:')).toBeInTheDocument();
-      expect(screen.getByText(/Markdown:/)).toBeInTheDocument();
-      expect(screen.getByText(/HTML:/)).toBeInTheDocument();
+      expect(screen.getByText(/HTML Preview:/)).toBeInTheDocument();
       expect(screen.getByText(/Print to PDF:/)).toBeInTheDocument();
+
+      // Verify no Markdown references
+      expect(screen.queryByText(/Markdown:/)).not.toBeInTheDocument();
     });
   });
 
-  describe('Markdown download', () => {
-    it('downloads report as markdown file', async () => {
+  describe('HTML Preview', () => {
+    it('opens new window with HTML content when clicked', async () => {
       const user = userEvent.setup();
+      const mockPreviewWindow = {
+        document: {
+          write: vi.fn(),
+          close: vi.fn(),
+        },
+        focus: vi.fn(),
+      };
+      mockWindowOpen.mockReturnValue(mockPreviewWindow);
+
       render(<AssessmentComplete report={mockReport} onStartNew={mockOnStartNew} />);
 
-      const downloadButton = screen.getByRole('button', { name: /Download assessment report as Markdown/i });
-      await user.click(downloadButton);
+      const previewButton = screen.getByRole('button', { name: /Preview assessment report as styled HTML in new tab/i });
+      await user.click(previewButton);
 
-      expect(mockCreateObjectURL).toHaveBeenCalledWith(expect.any(Blob));
-      expect(mockRevokeObjectURL).toHaveBeenCalledWith('blob:mock-url');
+      expect(mockWindowOpen).toHaveBeenCalledWith('', '_blank');
+      expect(mockPreviewWindow.document.write).toHaveBeenCalled();
+      expect(mockPreviewWindow.document.close).toHaveBeenCalled();
+      expect(mockPreviewWindow.focus).toHaveBeenCalled();
+
+      // Verify the written HTML contains expected structure
+      const writtenHtml = mockPreviewWindow.document.write.mock.calls[0][0];
+      expect(writtenHtml).toContain('AI Readiness Assessment Report');
+      expect(writtenHtml).toContain('<style>');
+      expect(writtenHtml).toContain('class="header"');
+      expect(writtenHtml).toContain('class="content"');
+      expect(writtenHtml).toContain('class="footer"');
     });
 
-    it('creates markdown blob with correct content', async () => {
+    it('shows error when popup is blocked', async () => {
       const user = userEvent.setup();
-      render(<AssessmentComplete report={mockReport} onStartNew={mockOnStartNew} />);
-
-      const downloadButton = screen.getByRole('button', { name: /Download assessment report as Markdown/i });
-      await user.click(downloadButton);
-
-      const blobCall = mockCreateObjectURL.mock.calls[0][0];
-      expect(blobCall.type).toBe('text/markdown');
-    });
-
-    it('sets correct filename with date', async () => {
-      const user = userEvent.setup();
-      render(<AssessmentComplete report={mockReport} onStartNew={mockOnStartNew} />);
-
-      const downloadButton = screen.getByRole('button', { name: /Download assessment report as Markdown/i });
-      await user.click(downloadButton);
-
-      // Just verify that createElement was called for an anchor tag
-      expect(mockCreateElement).toHaveBeenCalledWith('a');
-    });
-
-    it('shows error when markdown download fails', async () => {
-      const user = userEvent.setup();
-      mockCreateObjectURL.mockImplementation(() => {
-        throw new Error('Download failed');
-      });
+      mockWindowOpen.mockReturnValue(null);
 
       render(<AssessmentComplete report={mockReport} onStartNew={mockOnStartNew} />);
 
-      const downloadButton = screen.getByRole('button', { name: /Download assessment report as Markdown/i });
-      await user.click(downloadButton);
+      const previewButton = screen.getByRole('button', { name: /Preview assessment report as styled HTML in new tab/i });
+      await user.click(previewButton);
 
       await waitFor(() => {
-        expect(screen.getByText(/Failed to download Markdown file/)).toBeInTheDocument();
+        expect(screen.getByText(/Popup blocked/)).toBeInTheDocument();
       });
     });
-  });
 
-  describe('HTML download', () => {
-    it('downloads report as HTML file', async () => {
+    it('shows error when report is empty', async () => {
       const user = userEvent.setup();
-      render(<AssessmentComplete report={mockReport} onStartNew={mockOnStartNew} />);
+      render(<AssessmentComplete report="" onStartNew={mockOnStartNew} />);
 
-      const downloadButton = screen.getByRole('button', { name: /Download assessment report as HTML/i });
-      await user.click(downloadButton);
-
-      expect(mockCreateObjectURL).toHaveBeenCalledWith(expect.any(Blob));
-      expect(mockRevokeObjectURL).toHaveBeenCalledWith('blob:mock-url');
-    });
-
-    it('creates HTML blob with correct content type', async () => {
-      const user = userEvent.setup();
-      render(<AssessmentComplete report={mockReport} onStartNew={mockOnStartNew} />);
-
-      const downloadButton = screen.getByRole('button', { name: /Download assessment report as HTML/i });
-      await user.click(downloadButton);
-
-      const blobCall = mockCreateObjectURL.mock.calls[0][0];
-      expect(blobCall.type).toBe('text/html');
-    });
-
-    it('sets correct HTML filename with date', async () => {
-      const user = userEvent.setup();
-      render(<AssessmentComplete report={mockReport} onStartNew={mockOnStartNew} />);
-
-      const downloadButton = screen.getByRole('button', { name: /Download assessment report as HTML/i });
-      await user.click(downloadButton);
-
-      // Just verify that createElement was called for an anchor tag
-      expect(mockCreateElement).toHaveBeenCalledWith('a');
-    });
-
-    it('shows error when HTML download fails', async () => {
-      const user = userEvent.setup();
-      mockCreateObjectURL.mockImplementation(() => {
-        throw new Error('Download failed');
-      });
-
-      render(<AssessmentComplete report={mockReport} onStartNew={mockOnStartNew} />);
-
-      const downloadButton = screen.getByRole('button', { name: /Download assessment report as HTML/i });
-      await user.click(downloadButton);
+      const previewButton = screen.getByRole('button', { name: /Preview assessment report as styled HTML in new tab/i });
+      await user.click(previewButton);
 
       await waitFor(() => {
-        expect(screen.getByText(/Failed to download HTML file/)).toBeInTheDocument();
+        expect(screen.getByText(/report content is invalid/i)).toBeInTheDocument();
       });
     });
   });
@@ -230,7 +170,7 @@ describe('AssessmentComplete', () => {
       render(<AssessmentComplete report={mockReport} onStartNew={mockOnStartNew} />);
 
       const pdfButton = screen.getByRole('button', { name: /Generate PDF version/i });
-      
+
       // The loading state is very brief, so we just verify the button exists
       expect(pdfButton).toBeInTheDocument();
     });
@@ -276,7 +216,7 @@ describe('AssessmentComplete', () => {
       render(<AssessmentComplete report={mockReport} onStartNew={mockOnStartNew} />);
 
       const pdfButton = screen.getByRole('button', { name: /Generate PDF version/i });
-      
+
       // Button should be enabled initially
       expect(pdfButton).not.toBeDisabled();
     });
@@ -295,16 +235,14 @@ describe('AssessmentComplete', () => {
   });
 
   describe('Error handling', () => {
-    it('displays error alert when download fails', async () => {
+    it('displays error alert when HTML Preview fails with popup blocked', async () => {
       const user = userEvent.setup();
-      mockCreateObjectURL.mockImplementation(() => {
-        throw new Error('Test error');
-      });
+      mockWindowOpen.mockReturnValue(null);
 
       render(<AssessmentComplete report={mockReport} onStartNew={mockOnStartNew} />);
 
-      const downloadButton = screen.getByRole('button', { name: /Download assessment report as Markdown/i });
-      await user.click(downloadButton);
+      const previewButton = screen.getByRole('button', { name: /Preview assessment report as styled HTML in new tab/i });
+      await user.click(previewButton);
 
       await waitFor(() => {
         expect(screen.getByRole('alert')).toBeInTheDocument();
@@ -313,14 +251,12 @@ describe('AssessmentComplete', () => {
 
     it('allows closing error alert', async () => {
       const user = userEvent.setup();
-      mockCreateObjectURL.mockImplementation(() => {
-        throw new Error('Test error');
-      });
+      mockWindowOpen.mockReturnValue(null);
 
       render(<AssessmentComplete report={mockReport} onStartNew={mockOnStartNew} />);
 
-      const downloadButton = screen.getByRole('button', { name: /Download assessment report as Markdown/i });
-      await user.click(downloadButton);
+      const previewButton = screen.getByRole('button', { name: /Preview assessment report as styled HTML in new tab/i });
+      await user.click(previewButton);
 
       await waitFor(() => {
         expect(screen.getByRole('alert')).toBeInTheDocument();
@@ -346,8 +282,7 @@ describe('AssessmentComplete', () => {
     it('has descriptive aria-labels on all buttons', () => {
       render(<AssessmentComplete report={mockReport} onStartNew={mockOnStartNew} />);
 
-      expect(screen.getByRole('button', { name: /Download assessment report as Markdown file/i })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /Download assessment report as HTML file/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Preview assessment report as styled HTML in new tab/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /Generate PDF version/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /Start a new assessment/i })).toBeInTheDocument();
     });
