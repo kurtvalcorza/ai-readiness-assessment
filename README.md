@@ -66,7 +66,7 @@ A self-service chatbot for assessing AI readiness of Philippine government agenc
    - **Column G**: Next Steps (automatically extracted from report)
    - **Column H**: Conversation History (sanitized with PII redacted)
 
-2. Go to **Extensions** → **Apps Script** and paste the webhook code from [DEPLOYMENT.md](./DEPLOYMENT.md#create-a-google-apps-script-webhook) (includes HMAC-SHA256 signature verification)
+2. Go to **Extensions** → **Apps Script** and paste the webhook code from [DEPLOYMENT.md](./DEPLOYMENT.md#create-a-google-apps-script-webhook)
 
 3. Deploy as **Web app** (Execute as: Me, Access: Anyone)
 4. Copy the Web App URL and add to `.env.local` as `GOOGLE_SHEETS_WEBHOOK_URL`
@@ -102,8 +102,7 @@ ai-readiness-assessment/
 │   ├── systemPrompt.ts   # AI system prompt & assessment logic
 │   ├── types.ts          # TypeScript definitions
 │   ├── utils.ts          # Utility functions
-│   ├── validation.ts     # Security and data validation
-│   └── webhook-signing.ts # HMAC-SHA256 webhook signing
+│   └── validation.ts     # Security and data validation
 ├── tests/                # Comprehensive test suite
 ├── public/               # Static assets
 ├── .env.example          # Environment variables template
