@@ -30,49 +30,9 @@ This guide covers deploying the AI Readiness Assessment app to Vercel and settin
 2. Delete any existing code and paste this:
 
 ```javascript
-/**
- * Shared secret for HMAC-SHA256 signature verification.
- * Must match the WEBHOOK_SIGNING_SECRET env var in your Next.js app.
- * Generate with: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
- */
-var SIGNING_SECRET = 'YOUR_SECRET_HERE';
-
-/** Maximum allowed age of a request (5 minutes) to prevent replay attacks */
-var MAX_TIMESTAMP_DRIFT_MS = 300000;
-
 function doPost(e) {
   try {
-    // Signature and timestamp arrive as URL query parameters (?_sig=...&_ts=...)
-    // The raw HTTP body (e.postData.contents) is the exact string that was signed,
-    // so we verify against it directly — no JSON parse/re-serialize mismatch.
-    var sig = e.parameter._sig;
-    var ts  = e.parameter._ts;
-
-    if (SIGNING_SECRET && SIGNING_SECRET !== 'YOUR_SECRET_HERE' && sig) {
-      if (!sig || !ts) {
-        return ContentService.createTextOutput(JSON.stringify({ success: false, error: 'Missing signature' }))
-          .setMimeType(ContentService.MimeType.JSON);
-      }
-
-      // Reject stale requests
-      var requestAge = Date.now() - Number(ts);
-      if (isNaN(requestAge) || Math.abs(requestAge) > MAX_TIMESTAMP_DRIFT_MS) {
-        return ContentService.createTextOutput(JSON.stringify({ success: false, error: 'Request expired' }))
-          .setMimeType(ContentService.MimeType.JSON);
-      }
-
-      // Verify HMAC-SHA256: message = timestamp + "." + raw body
-      var rawBody = e.postData.contents;
-      var expectedSig = computeHmacSha256(ts + '.' + rawBody, SIGNING_SECRET);
-      if (sig !== expectedSig) {
-        return ContentService.createTextOutput(JSON.stringify({ success: false, error: 'Invalid signature' }))
-          .setMimeType(ContentService.MimeType.JSON);
-      }
-    }
-
-    // Parse the body (clean JSON, no wrapper fields)
     var data = JSON.parse(e.postData.contents);
-
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
 
     sheet.appendRow([
@@ -93,19 +53,7 @@ function doPost(e) {
       .setMimeType(ContentService.MimeType.JSON);
   }
 }
-
-/** Compute HMAC-SHA256 and return hex string */
-function computeHmacSha256(message, secret) {
-  var sig = Utilities.computeHmacSha256Signature(message, secret);
-  return sig.map(function(byte) {
-    return ('0' + (byte & 0xFF).toString(16)).slice(-2);
-  }).join('');
-}
 ```
-
-> **Note:** Replace `YOUR_SECRET_HERE` with the same value you set for `WEBHOOK_SIGNING_SECRET` in your Vercel/Amplify environment variables. If you leave it as `YOUR_SECRET_HERE`, signature verification is skipped (backwards compatible).
->
-> **How it works:** The signature (`_sig`) and timestamp (`_ts`) are sent as URL query parameters, not in the JSON body. The HMAC is computed over `timestamp + "." + rawBody` where `rawBody` is the exact HTTP body string sent by Node.js. Apps Script accesses the raw body via `e.postData.contents`, which avoids any JSON serialization mismatches between Node.js and Apps Script.
 
 3. Click **Deploy** → **New deployment**
 4. Choose type: **Web app**
@@ -140,7 +88,6 @@ function computeHmacSha256(message, secret) {
 5. Add Environment Variables:
    - `GOOGLE_GENERATIVE_AI_API_KEY`: Your Google AI API key
    - `GOOGLE_SHEETS_WEBHOOK_URL`: The Web App URL from Step 1
-   - `WEBHOOK_SIGNING_SECRET`: The same secret you set in your Apps Script (optional but recommended)
 
 6. Click **Deploy**
 

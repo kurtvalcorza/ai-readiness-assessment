@@ -9,7 +9,6 @@ frontend:
         # Inject environment variables into .env file for Next.js runtime
         - echo "GOOGLE_GENERATIVE_AI_API_KEY=$GOOGLE_GENERATIVE_AI_API_KEY" >> .env
         - echo "GOOGLE_SHEETS_WEBHOOK_URL=$GOOGLE_SHEETS_WEBHOOK_URL" >> .env
-        - echo "WEBHOOK_SIGNING_SECRET=$WEBHOOK_SIGNING_SECRET" >> .env
         - npm run build
   artifacts:
     baseDirectory: .next
