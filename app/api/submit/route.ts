@@ -140,6 +140,7 @@ export async function POST(req: Request): Promise<Response> {
       'Next steps must be an array',
       'Invalid solution structure',
       'Field values exceed maximum length',
+      'Google Sheets script error',
     ];
     const clientMessage = safeMessages.find((msg) => error.message?.includes(msg))
       ? error.message
