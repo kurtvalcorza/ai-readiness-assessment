@@ -11,7 +11,7 @@ import { z } from 'zod';
  */
 export const envSchema = z.object({
   GOOGLE_GENERATIVE_AI_API_KEY: z.string().min(1, 'API key is required'),
-  GOOGLE_SHEETS_WEBHOOK_URL: z.string().url().optional(),
+  GOOGLE_SHEETS_WEBHOOK_URL: z.string().url().optional().or(z.literal('')),
   WEBHOOK_SIGNING_SECRET: z.string().optional(),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 });

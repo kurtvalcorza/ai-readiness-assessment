@@ -31,8 +31,21 @@ export async function POST(req: Request): Promise<Response> {
 
     const data: AssessmentData = await req.json();
 
+    console.log('[submit] Received data keys:', Object.keys(data));
+    console.log('[submit] Organization:', data.organization?.substring(0, 50));
+    console.log('[submit] Solutions count:', data.solutions?.length);
+    console.log('[submit] NextSteps count:', data.nextSteps?.length);
+    console.log('[submit] Webhook URL configured:', !!process.env.GOOGLE_SHEETS_WEBHOOK_URL);
+    console.log('[submit] Webhook URL length:', process.env.GOOGLE_SHEETS_WEBHOOK_URL?.length ?? 0);
+
     // Validate data structure
-    validateAssessmentData(data);
+    try {
+      validateAssessmentData(data);
+      console.log('[submit] Validation passed');
+    } catch (validationError: any) {
+      console.error('[submit] Validation failed:', validationError.message);
+      throw validationError;
+    }
 
     // Validate data sizes to prevent abuse
     if (
@@ -43,10 +56,12 @@ export async function POST(req: Request): Promise<Response> {
     }
 
     // Submit to Google Sheets
+    console.log('[submit] Submitting to Google Sheets...');
     const result = await submitAssessment(data, {
       webhookUrl: process.env.GOOGLE_SHEETS_WEBHOOK_URL,
       signingSecret: process.env.WEBHOOK_SIGNING_SECRET,
     });
+    console.log('[submit] Submission result:', JSON.stringify(result));
 
     if (!result.success) {
       // Check if it's a Google Sheets script error (should be surfaced to client)
@@ -59,7 +74,8 @@ export async function POST(req: Request): Promise<Response> {
 
     return createJsonResponse({ success: true, message: result.message }, { status: 200 });
   } catch (error: any) {
-    console.error('Submit API error:', error);
+    console.error('[submit] Unhandled error:', error.message);
+    console.error('[submit] Error stack:', error.stack);
 
     // Only surface known validation errors to the client
     const safeMessages = [

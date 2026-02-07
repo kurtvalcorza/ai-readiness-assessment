@@ -60,7 +60,7 @@ export async function submitAssessment(
 ): Promise<SubmissionResult> {
   // Check if webhook is configured
   if (!config.webhookUrl) {
-    console.warn('Google Sheets webhook URL not configured');
+    console.warn('[submitAssessment] Google Sheets webhook URL not configured');
     return {
       success: true,
       message: 'Data received (webhook not configured)',
@@ -70,22 +70,40 @@ export async function submitAssessment(
   try {
     // Format data for Google Sheets
     const formattedData = formatForGoogleSheets(data);
+    console.log('[submitAssessment] Formatted data keys:', Object.keys(formattedData));
 
     // Sign payload if secret is provided
     const body = signPayload(formattedData, config.signingSecret);
+    console.log('[submitAssessment] Payload size:', body.length, 'bytes');
 
     // Submit to webhook
+    console.log('[submitAssessment] Fetching webhook URL...');
     const response = await fetch(config.webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body,
     });
 
+    console.log('[submitAssessment] Response status:', response.status);
+    console.log('[submitAssessment] Response redirected:', response.redirected);
+
     if (!response.ok) {
+      const responseText = await response.text().catch(() => 'Could not read response body');
+      console.error('[submitAssessment] Non-OK response body:', responseText.substring(0, 500));
       throw new Error(`Google Sheets submission failed: ${response.statusText}`);
     }
 
-    const result = await response.json();
+    const responseText = await response.text();
+    console.log('[submitAssessment] Response body:', responseText.substring(0, 500));
+
+    let result;
+    try {
+      result = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('[submitAssessment] Failed to parse response as JSON:', responseText.substring(0, 200));
+      throw new Error(`Google Sheets returned non-JSON response: ${responseText.substring(0, 100)}`);
+    }
+
     if (!result.success) {
       throw new Error(`Google Sheets script error: ${result.error || 'Unknown error'}`);
     }
@@ -95,6 +113,7 @@ export async function submitAssessment(
       message: 'Assessment submitted successfully',
     };
   } catch (error: any) {
+    console.error('[submitAssessment] Error:', error.message);
     return {
       success: false,
       message: 'Submission failed. Please try again.',
