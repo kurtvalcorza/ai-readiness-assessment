@@ -8,9 +8,9 @@ import { streamText } from 'ai';
 import { systemPrompt } from '@/lib/systemPrompt';
 import { validateEnv } from '@/lib/env';
 import { checkChatRateLimit } from '@/lib/rate-limit';
-import { validateMessageContent, detectPromptInjection } from '@/lib/validation';
-import { MAX_MESSAGE_LENGTH, MAX_MESSAGES_COUNT, BLOCK_PROMPT_INJECTION } from '@/lib/constants';
-import { CoreMessage, IncomingMessage } from '@/lib/types';
+import { createErrorResponse } from '@/lib/api-utils';
+import { validateConversation, prepareMessagesForAI } from '@/services/chatService';
+import { IncomingMessage } from '@/lib/types';
 
 export const maxDuration = 30;
 
@@ -24,18 +24,13 @@ export async function POST(req: Request) {
     // Rate limiting check
     const rateLimit = await checkChatRateLimit(req);
     if (!rateLimit.allowed) {
-      return new Response(
-        JSON.stringify({
-          error: 'Too many requests. Please wait a moment before trying again.',
-        }),
+      return createErrorResponse(
+        'Too many requests. Please wait a moment before trying again.',
+        429,
         {
-          status: 429,
           headers: {
-            'Content-Type': 'application/json',
             'X-RateLimit-Remaining': '0',
             'Retry-After': '60',
-            'X-Content-Type-Options': 'nosniff',
-            'X-Frame-Options': 'DENY',
           },
         }
       );
@@ -46,64 +41,14 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { messages } = body;
 
-    if (!messages || !Array.isArray(messages)) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid request: messages array is required' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
+    // Validate conversation structure
+    const conversationValidation = validateConversation(messages);
+    if (!conversationValidation.valid) {
+      return createErrorResponse(conversationValidation.error!, 400);
     }
 
-    // Validate message count
-    if (messages.length > MAX_MESSAGES_COUNT) {
-      return new Response(
-        JSON.stringify({
-          error: 'Too many messages in conversation. Please start a new assessment.',
-        }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Convert to CoreMessage format and validate content
-    const coreMessages: CoreMessage[] = messages.map((m: IncomingMessage) => {
-      let content = '';
-      if (m.parts) {
-        content = m.parts
-          .filter((p) => p.type === 'text')
-          .map((p) => p.text)
-          .join('');
-      } else if (typeof m.content === 'string') {
-        content = m.content;
-      }
-
-      // Validate message length
-      if (content.length > MAX_MESSAGE_LENGTH) {
-        throw new Error(`Message exceeds maximum length of ${MAX_MESSAGE_LENGTH} characters`);
-      }
-
-      // Validate content and check for malicious patterns
-      if (m.role === 'user') {
-        // Validate message content (spam detection)
-        validateMessageContent(content);
-
-        // Check for potential prompt injection attempts
-        const injectionPatterns = detectPromptInjection(content);
-        if (injectionPatterns.length > 0) {
-          console.warn('Potential prompt injection detected:', injectionPatterns);
-
-          if (BLOCK_PROMPT_INJECTION) {
-            throw new Error(
-              'Your message contains patterns that may indicate a security risk. ' +
-                'Please rephrase your response and avoid using system commands or unusual formatting.'
-            );
-          }
-        }
-      }
-
-      return {
-        role: m.role,
-        content,
-      };
-    });
+    // Prepare messages for AI (validates and converts format)
+    const coreMessages = prepareMessagesForAI(messages as IncomingMessage[]);
 
     const result = streamText({
       model: google('models/gemini-2.5-flash'),
@@ -121,20 +66,15 @@ export async function POST(req: Request) {
       'Your message contains patterns that may indicate a security risk',
       'Invalid input detected',
     ];
-    const clientMessage = safeMessages.find((msg) => error.message?.includes(msg))
-      ? error.message
-      : 'An internal error occurred. Please try again.';
-
-    return new Response(
-      JSON.stringify({ error: clientMessage }),
-      { 
-        status: error.message?.includes('maximum length') || error.message?.includes('Invalid input') ? 400 : 500, 
-        headers: { 
-          'Content-Type': 'application/json',
-          'X-Content-Type-Options': 'nosniff',
-          'X-Frame-Options': 'DENY',
-        } 
-      }
-    );
+    
+    const isKnownError = safeMessages.some((msg) => error.message?.includes(msg));
+    
+    if (isKnownError) {
+      // Known validation errors - return as-is with 400 status
+      return createErrorResponse(error.message, 400, { sanitize: false });
+    } else {
+      // Unknown errors - return generic message with 500 status and disable sanitization
+      return createErrorResponse('An internal error occurred. Please try again.', 500, { sanitize: false });
+    }
   }
 }
