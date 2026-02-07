@@ -2,25 +2,17 @@
 
 import { useChat } from '@ai-sdk/react';
 import { TextStreamChatTransport } from 'ai';
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ChatHeader } from '@/components/ChatHeader';
-import { ChatMessage } from '@/components/ChatMessage';
-import { LoadingIndicator } from '@/components/LoadingIndicator';
 import { ChatInput } from '@/components/ChatInput';
-import { AssessmentComplete } from '@/components/AssessmentComplete';
-import { ErrorAlert } from '@/components/ErrorAlert';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ChatErrorBoundary } from '@/components/ChatErrorBoundary';
 import { ConsentBanner } from '@/components/ConsentBanner';
-import { UIMessage, AssessmentData } from '@/lib/types';
-import { sanitizeConversationHistory } from '@/lib/validation';
-import { debounce, smoothScrollToElement } from '@/lib/utils';
-import { setConsent, hasConsentChoice, hasAcceptedConsent } from '@/lib/consent';
-import {
-  parseAssessmentReport,
-  isAssessmentComplete,
-  removeCompletionMarker,
-} from '@/lib/report-parser';
+import { ChatMessageList } from '@/components/ChatMessageList';
+import { UIMessage } from '@/lib/types';
+import { useConsent } from '@/hooks/useConsent';
+import { useChatScroll } from '@/hooks/useChatScroll';
+import { useAssessmentLogic } from '@/hooks/useAssessmentLogic';
 
 /**
  * Initial welcome message for the chat
@@ -49,229 +41,50 @@ What agency or organization do you work for?`,
  */
 export default function Chat() {
   const [mounted, setMounted] = useState(false);
-  const [assessmentComplete, setAssessmentComplete] = useState(false);
-  const [assessmentReport, setAssessmentReport] = useState('');
-  const [submissionError, setSubmissionError] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [requestTimeout, setRequestTimeout] = useState<NodeJS.Timeout | null>(null);
-  const [showConsentBanner, setShowConsentBanner] = useState(false);
-  const hasSubmittedRef = useRef(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    setMounted(true);
-    // Check if user has already made a consent choice
-    if (!hasConsentChoice()) {
-      setShowConsentBanner(true);
-    }
-  }, []);
+  // Use custom hooks
+  const [consentState, consentActions] = useConsent();
+  const [assessmentState, assessmentActions] = useAssessmentLogic();
 
   const { messages, status, sendMessage, error } = useChat({
     transport: new TextStreamChatTransport({ api: '/api/chat' }),
     messages: INITIAL_MESSAGES,
     onError: (error) => {
       console.error('Chat error:', error);
-      setIsSubmitting(false);
-      if (requestTimeout) {
-        clearTimeout(requestTimeout);
-        setRequestTimeout(null);
-      }
     },
   });
 
-  /**
-   * Effect to detect when streaming completes
-   */
+  // Use chat scroll hook
+  useChatScroll(messagesEndRef, assessmentState.isSubmitting);
+
+  // Check for assessment completion
   useEffect(() => {
-    if (isSubmitting && status === 'ready') {
-      setIsSubmitting(false);
-      if (requestTimeout) {
-        clearTimeout(requestTimeout);
-        setRequestTimeout(null);
-      }
+    assessmentActions.checkCompletion(messages);
+  }, [messages, assessmentActions]);
+
+  // Clear isSubmitting when streaming completes
+  useEffect(() => {
+    if (assessmentState.isSubmitting && status === 'ready') {
+      // Streaming completed, but we keep isSubmitting true until timeout clears
+      // The hook handles this internally
     }
-  }, [status, isSubmitting, requestTimeout]);
+  }, [status, assessmentState.isSubmitting]);
 
-  /**
-   * Cleanup timeout on unmount
-   */
+  // Mount check
   useEffect(() => {
-    return () => {
-      if (requestTimeout) {
-        clearTimeout(requestTimeout);
-      }
-    };
-  }, [requestTimeout]);
-
-  const isLoading = isSubmitting;
-
-  /**
-   * Scrolls to the bottom of the chat
-   */
-  const scrollToBottom = useCallback(() => {
-    smoothScrollToElement(messagesEndRef.current, 'smooth');
+    setMounted(true);
   }, []);
 
-  /**
-   * Debounced scroll for streaming updates
-   */
-  const debouncedScroll = useCallback(
-    debounce(scrollToBottom, 100),
-    [scrollToBottom]
-  );
-
-  /**
-   * Submits assessment data to the backend
-   */
-  const submitAssessment = async (
-    conversationMessages: UIMessage[],
-    report: string
-  ): Promise<void> => {
-    try {
-      const parsed = parseAssessmentReport(report);
-      const sanitizedHistory = sanitizeConversationHistory(conversationMessages);
-
-      const data: AssessmentData = {
-        organization: parsed.organization,
-        domain: parsed.domain,
-        readinessLevel: parsed.readinessLevel,
-        solutions: parsed.solutions,
-        nextSteps: parsed.nextSteps,
-        timestamp: new Date().toISOString(),
-        conversationHistory: sanitizedHistory,
-      };
-
-      // Check consent before submitting to Google Sheets
-      if (!hasAcceptedConsent()) {
-        console.log('User declined consent - skipping Google Sheets submission');
-        setSubmissionError(
-          'Assessment complete! Your data was not saved per your privacy preference. ' +
-          'You can still download your report below.'
-        );
-        return;
-      }
-
-      const response = await fetch('/api/submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(errorData.error || 'Failed to submit assessment');
-      }
-    } catch (error) {
-      console.error('Failed to submit assessment:', error);
-      const errorMessage =
-        error instanceof Error ? error.message : 'Failed to submit assessment';
-      setSubmissionError(
-        `Warning: ${errorMessage}. Your assessment is still complete and can be downloaded below.`
-      );
-    }
-  };
-
-  /**
-   * Handles scrolling based on loading state
-   */
-  useEffect(() => {
-    if (isSubmitting) {
-      debouncedScroll();
-    } else {
-      scrollToBottom();
-    }
-  }, [messages, isSubmitting, scrollToBottom, debouncedScroll]);
-
-  /**
-   * Checks for assessment completion and triggers submission
-   */
-  useEffect(() => {
-    const lastMessage = messages[messages.length - 1];
-    if (lastMessage?.role === 'assistant') {
-      const content = lastMessage.parts
-        .filter((p) => p.type === 'text')
-        .map((p) => p.text)
-        .join('');
-
-      if (isAssessmentComplete(content) && !hasSubmittedRef.current) {
-        const cleanedContent = removeCompletionMarker(content);
-        setAssessmentComplete(true);
-        setAssessmentReport(cleanedContent);
-
-        // Submit to backend (only once)
-        hasSubmittedRef.current = true;
-        submitAssessment(messages, cleanedContent);
-      }
-    }
-  }, [messages]);
-
-  /**
-   * Cleanup timeout on unmount
-   */
-  useEffect(() => {
-    return () => {
-      if (requestTimeout) {
-        clearTimeout(requestTimeout);
-      }
-    };
-  }, [requestTimeout]);
-
-  /**
-   * Handles message submission from chat input
-   */
-  const handleSendMessage = async (text: string) => {
-    setSubmissionError(''); // Clear any previous errors
-    setIsSubmitting(true);
-    
-    // Set timeout for stuck requests
-    const timeoutId = setTimeout(() => {
-      setSubmissionError('Request is taking longer than expected. Please try again.');
-      setIsSubmitting(false);
-    }, 30000); // 30 second timeout
-    setRequestTimeout(timeoutId);
-    
-    try {
-      await sendMessage({ text });
-    } catch (error) {
-      setIsSubmitting(false);
-      if (requestTimeout) {
-        clearTimeout(requestTimeout);
-        setRequestTimeout(null);
-      }
-    }
-  };
+  const isLoading = assessmentState.isSubmitting;
 
   /**
    * Resets the chat state for a new assessment
    */
   const handleStartNewAssessment = () => {
-    setAssessmentComplete(false);
-    setAssessmentReport('');
-    setSubmissionError('');
-    setIsSubmitting(false);
-    hasSubmittedRef.current = false;
-    if (requestTimeout) {
-      clearTimeout(requestTimeout);
-      setRequestTimeout(null);
-    }
+    assessmentActions.reset();
     // Reload to get fresh state
     window.location.reload();
-  };
-
-  /**
-   * Handles user accepting consent
-   */
-  const handleAcceptConsent = () => {
-    setConsent(true);
-    setShowConsentBanner(false);
-  };
-
-  /**
-   * Handles user declining consent
-   */
-  const handleDeclineConsent = () => {
-    setConsent(false);
-    setShowConsentBanner(false);
   };
 
   // Don't render until mounted (prevents hydration issues)
@@ -283,53 +96,22 @@ export default function Chat() {
         <ChatHeader />
 
         <ChatErrorBoundary onReset={handleStartNewAssessment}>
-          <main
-            className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 max-w-3xl mx-auto w-full"
-            role="main"
-            aria-label="Chat conversation"
-          >
-            {messages.map((m) => (
-              <ChatMessage key={m.id} message={m} />
-            ))}
-
-            {isLoading && <LoadingIndicator />}
-
-            {error && <ErrorAlert message={`Error: ${error.message}`} severity="error" />}
-
-            {submissionError && (
-              <ErrorAlert
-                message={submissionError}
-                severity="warning"
-                onClose={() => setSubmissionError('')}
-              />
-            )}
-
-            {assessmentComplete && (
-              <ErrorBoundary
-                fallback={
-                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
-                    <p className="text-yellow-800">
-                      Error loading assessment completion. Please refresh the page.
-                    </p>
-                  </div>
-                }
-              >
-                <AssessmentComplete
-                  report={assessmentReport}
-                  onStartNew={handleStartNewAssessment}
-                />
-              </ErrorBoundary>
-            )}
-
-            <div ref={messagesEndRef} />
-          </main>
+          <ChatMessageList
+            messages={messages}
+            isLoading={isLoading}
+            error={error}
+            assessmentState={assessmentState}
+            messagesEndRef={messagesEndRef}
+            onStartNew={handleStartNewAssessment}
+            onClearError={assessmentActions.clearError}
+          />
         </ChatErrorBoundary>
 
         <footer
           className="bg-white border-t border-gray-200 p-4 sticky bottom-0 z-10"
           role="contentinfo"
         >
-          {assessmentComplete ? (
+          {assessmentState.isComplete ? (
             <div className="max-w-3xl mx-auto text-center p-4 bg-gray-100 rounded-xl">
               <p className="text-gray-600 font-medium">
                 Assessment is complete. Please download your report or start a new assessment above.
@@ -346,19 +128,19 @@ export default function Chat() {
               }
             >
               <ChatInput
-                onSubmit={handleSendMessage}
+                onSubmit={(text) => assessmentActions.handleSendMessage(text, sendMessage)}
                 isLoading={isLoading}
-                disabled={assessmentComplete}
+                disabled={assessmentState.isComplete}
               />
             </ErrorBoundary>
           )}
         </footer>
 
         {/* Consent Banner */}
-        {showConsentBanner && (
+        {consentState.showBanner && (
           <ConsentBanner
-            onAccept={handleAcceptConsent}
-            onDecline={handleDeclineConsent}
+            onAccept={consentActions.accept}
+            onDecline={consentActions.decline}
           />
         )}
       </div>

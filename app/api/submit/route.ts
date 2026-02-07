@@ -25,7 +25,7 @@ export async function POST(req: Request): Promise<Response> {
       return createErrorResponse(
         'Too many submissions. Please wait a few minutes before submitting again.',
         429,
-        { 'Retry-After': '300' }
+        { headers: { 'Retry-After': '300' } }
       );
     }
 
@@ -57,7 +57,7 @@ export async function POST(req: Request): Promise<Response> {
       return createErrorResponse('Submission failed. Please try again.', 500, { sanitize: false });
     }
 
-    return createJsonResponse({ success: true, message: result.message }, 200);
+    return createJsonResponse({ success: true, message: result.message }, { status: 200 });
   } catch (error: any) {
     console.error('Submit API error:', error);
 
@@ -71,6 +71,8 @@ export async function POST(req: Request): Promise<Response> {
       'Invalid solution structure',
       'Field values exceed maximum length',
       'Google Sheets script error',
+      'Validation failed:', // Zod validation errors
+      'Invalid assessment data structure', // Zod validation fallback
     ];
     const clientMessage = safeMessages.find((msg) => error.message?.includes(msg))
       ? error.message

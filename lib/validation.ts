@@ -11,6 +11,7 @@ import {
   MAX_CONVERSATION_HISTORY_SIZE,
 } from './constants';
 import { UIMessage } from './types';
+import { assessmentDataSchema } from './schemas';
 
 /**
  * Validates message content for potential spam or malicious input
@@ -113,35 +114,22 @@ export function sanitizeConversationHistory(messages: UIMessage[]): string {
 }
 
 /**
- * Validates assessment data structure
+ * Validates assessment data structure using Zod schema
  * @param data - Assessment data to validate
- * @throws {Error} If data structure is invalid
+ * @throws {Error} If data structure is invalid with detailed error messages
  */
 export function validateAssessmentData(data: any): void {
-  if (!data.organization || typeof data.organization !== 'string') {
-    throw new Error('Invalid organization field');
-  }
-
-  if (!data.domain || typeof data.domain !== 'string') {
-    throw new Error('Invalid domain field');
-  }
-
-  if (!data.readinessLevel || typeof data.readinessLevel !== 'string') {
-    throw new Error('Invalid readinessLevel field');
-  }
-
-  if (!Array.isArray(data.solutions)) {
-    throw new Error('Solutions must be an array');
-  }
-
-  if (!Array.isArray(data.nextSteps)) {
-    throw new Error('Next steps must be an array');
-  }
-
-  // Validate each solution has required fields
-  for (const solution of data.solutions) {
-    if (!solution.priority || !solution.category || !solution.group || !solution.fit) {
-      throw new Error('Invalid solution structure');
+  try {
+    assessmentDataSchema.parse(data);
+  } catch (error: any) {
+    if (error.errors && Array.isArray(error.errors)) {
+      // Format Zod validation errors into a readable message
+      const errorMessages = error.errors.map((err: any) => {
+        const path = err.path.join('.');
+        return `${path}: ${err.message}`;
+      }).join(', ');
+      throw new Error(`Validation failed: ${errorMessages}`);
     }
+    throw new Error('Invalid assessment data structure');
   }
 }

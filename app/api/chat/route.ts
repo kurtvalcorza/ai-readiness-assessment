@@ -56,7 +56,13 @@ export async function POST(req: Request) {
       messages: coreMessages,
     });
 
-    return result.toTextStreamResponse();
+    const response = result.toTextStreamResponse();
+    
+    // Add security headers to streaming response
+    response.headers.set('X-Content-Type-Options', 'nosniff');
+    response.headers.set('X-Frame-Options', 'DENY');
+    
+    return response;
   } catch (error: any) {
     console.error('Chat API error:', error);
 

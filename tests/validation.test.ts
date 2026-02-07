@@ -126,32 +126,32 @@ describe('Validation utilities', () => {
 
     it('should reject missing organization', () => {
       const invalid = { ...validData, organization: '' };
-      expect(() => validateAssessmentData(invalid)).toThrow('Invalid organization');
+      expect(() => validateAssessmentData(invalid)).toThrow('Validation failed');
     });
 
     it('should reject non-string organization', () => {
       const invalid = { ...validData, organization: 123 };
-      expect(() => validateAssessmentData(invalid)).toThrow('Invalid organization');
+      expect(() => validateAssessmentData(invalid)).toThrow('Validation failed');
     });
 
     it('should reject missing domain', () => {
       const invalid = { ...validData, domain: '' };
-      expect(() => validateAssessmentData(invalid)).toThrow('Invalid domain');
+      expect(() => validateAssessmentData(invalid)).toThrow('Validation failed');
     });
 
     it('should reject missing readiness level', () => {
       const invalid = { ...validData, readinessLevel: '' };
-      expect(() => validateAssessmentData(invalid)).toThrow('Invalid readinessLevel');
+      expect(() => validateAssessmentData(invalid)).toThrow('Validation failed');
     });
 
     it('should reject non-array solutions', () => {
       const invalid = { ...validData, solutions: 'not an array' };
-      expect(() => validateAssessmentData(invalid)).toThrow('Solutions must be an array');
+      expect(() => validateAssessmentData(invalid)).toThrow('Validation failed');
     });
 
     it('should reject non-array nextSteps', () => {
       const invalid = { ...validData, nextSteps: 'not an array' };
-      expect(() => validateAssessmentData(invalid)).toThrow('Next steps must be an array');
+      expect(() => validateAssessmentData(invalid)).toThrow('Validation failed');
     });
 
     it('should reject invalid solution structure', () => {
@@ -159,7 +159,31 @@ describe('Validation utilities', () => {
         ...validData,
         solutions: [{ priority: 'Primary' }], // Missing required fields
       };
-      expect(() => validateAssessmentData(invalid)).toThrow('Invalid solution structure');
+      expect(() => validateAssessmentData(invalid)).toThrow('Validation failed');
+    });
+
+    it('should reject organization exceeding max length', () => {
+      const invalid = { ...validData, organization: 'a'.repeat(501) };
+      expect(() => validateAssessmentData(invalid)).toThrow('Validation failed');
+    });
+
+    it('should reject domain exceeding max length', () => {
+      const invalid = { ...validData, domain: 'a'.repeat(501) };
+      expect(() => validateAssessmentData(invalid)).toThrow('Validation failed');
+    });
+
+    it('should reject invalid timestamp format', () => {
+      const invalid = { ...validData, timestamp: 'not a valid datetime' };
+      expect(() => validateAssessmentData(invalid)).toThrow('Validation failed');
+    });
+
+    it('should accept optional conversationHistory', () => {
+      const withHistory = { ...validData, conversationHistory: 'Some history' };
+      expect(() => validateAssessmentData(withHistory)).not.toThrow();
+    });
+
+    it('should accept data without conversationHistory', () => {
+      expect(() => validateAssessmentData(validData)).not.toThrow();
     });
   });
 });
