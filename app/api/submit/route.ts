@@ -5,7 +5,7 @@
 
 import { checkSubmissionRateLimit } from '@/lib/rate-limit';
 import { validateAssessmentData } from '@/lib/validation';
-import { signWebhookRequest } from '@/lib/webhook-signing';
+import { signWebhookPayload } from '@/lib/webhook-signing';
 import { MAX_ORGANIZATION_LENGTH, MAX_DOMAIN_LENGTH } from '@/lib/constants';
 import { AssessmentData, GoogleSheetsData, APISuccess, APIError } from '@/lib/types';
 
@@ -91,17 +91,14 @@ export async function POST(req: Request): Promise<Response> {
     // Submit to Google Sheets via webhook
     const signingSecret = process.env.WEBHOOK_SIGNING_SECRET;
     let body: string;
-    let targetUrl = webhookUrl;
 
     if (signingSecret) {
-      const signed = signWebhookRequest(formattedData, signingSecret);
-      body = signed.body;
-      targetUrl = webhookUrl + signed.queryParams;
+      body = signWebhookPayload(formattedData, signingSecret);
     } else {
       body = JSON.stringify(formattedData);
     }
 
-    const response = await fetch(targetUrl, {
+    const response = await fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body,
