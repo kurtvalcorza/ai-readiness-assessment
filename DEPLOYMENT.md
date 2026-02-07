@@ -35,19 +35,19 @@ This guide covers deploying the AI Readiness Assessment app to Vercel and settin
  * Must match the WEBHOOK_SIGNING_SECRET env var in your Next.js app.
  * Generate with: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
  */
-const SIGNING_SECRET = 'YOUR_SECRET_HERE';
+var SIGNING_SECRET = 'YOUR_SECRET_HERE';
 
 /** Maximum allowed age of a request (5 minutes) to prevent replay attacks */
-const MAX_TIMESTAMP_DRIFT_MS = 300000;
+var MAX_TIMESTAMP_DRIFT_MS = 300000;
 
 function doPost(e) {
   try {
-    var fullData = JSON.parse(e.postData.contents);
+    var raw = JSON.parse(e.postData.contents);
 
-    // Verify HMAC signature if signing secret is configured
-    if (SIGNING_SECRET && SIGNING_SECRET !== 'YOUR_SECRET_HERE') {
-      var signature = fullData._webhookSignature;
-      var timestamp = fullData._webhookTimestamp;
+    // If the payload contains signing fields, verify the signature
+    if (SIGNING_SECRET && SIGNING_SECRET !== 'YOUR_SECRET_HERE' && raw._webhookPayload) {
+      var signature = raw._webhookSignature;
+      var timestamp = raw._webhookTimestamp;
 
       if (!signature || !timestamp) {
         return ContentService.createTextOutput(JSON.stringify({ success: false, error: 'Missing signature' }))
@@ -61,33 +61,31 @@ function doPost(e) {
           .setMimeType(ContentService.MimeType.JSON);
       }
 
-      // Reconstruct the original payload (without signature fields) for verification
-      var originalData = {};
-      for (var key in fullData) {
-        if (key !== '_webhookSignature' && key !== '_webhookTimestamp') {
-          originalData[key] = fullData[key];
-        }
-      }
-      var originalBody = JSON.stringify(originalData);
-      var expectedSignature = computeHmacSha256(timestamp + '.' + originalBody, SIGNING_SECRET);
-
+      // Verify HMAC-SHA256 using the exact payload string that was signed
+      var expectedSignature = computeHmacSha256(timestamp + '.' + raw._webhookPayload, SIGNING_SECRET);
       if (signature !== expectedSignature) {
         return ContentService.createTextOutput(JSON.stringify({ success: false, error: 'Invalid signature' }))
           .setMimeType(ContentService.MimeType.JSON);
       }
+
+      // Parse the verified payload to get the actual data
+      var data = JSON.parse(raw._webhookPayload);
+    } else {
+      // Unsigned request (backwards compatible)
+      var data = raw;
     }
 
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
 
     sheet.appendRow([
-      fullData.timestamp,
-      fullData.organization,
-      fullData.domain,
-      fullData.readinessLevel,
-      fullData.primarySolution,
-      fullData.secondarySolution,
-      fullData.nextSteps,
-      fullData.conversationHistory
+      data.timestamp,
+      data.organization,
+      data.domain,
+      data.readinessLevel,
+      data.primarySolution,
+      data.secondarySolution,
+      data.nextSteps,
+      data.conversationHistory
     ]);
 
     return ContentService.createTextOutput(JSON.stringify({ success: true }))
@@ -100,8 +98,8 @@ function doPost(e) {
 
 /** Compute HMAC-SHA256 and return hex string */
 function computeHmacSha256(message, secret) {
-  var signature = Utilities.computeHmacSha256Signature(message, secret);
-  return signature.map(function(byte) {
+  var sig = Utilities.computeHmacSha256Signature(message, secret);
+  return sig.map(function(byte) {
     return ('0' + (byte & 0xFF).toString(16)).slice(-2);
   }).join('');
 }
