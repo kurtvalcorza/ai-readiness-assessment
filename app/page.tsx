@@ -63,13 +63,7 @@ export default function Chat() {
     assessmentActions.checkCompletion(messages);
   }, [messages, assessmentActions]);
 
-  // Clear isSubmitting when streaming completes
-  useEffect(() => {
-    if (assessmentState.isSubmitting && status === 'ready') {
-      // Streaming completed, but we keep isSubmitting true until timeout clears
-      // The hook handles this internally
-    }
-  }, [status, assessmentState.isSubmitting]);
+
 
   // Mount check
   useEffect(() => {

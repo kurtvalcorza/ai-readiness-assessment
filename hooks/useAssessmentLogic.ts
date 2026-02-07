@@ -157,8 +157,18 @@ export function useAssessmentLogic(): [AssessmentState, AssessmentActions] {
     (messages: UIMessage[]) => {
       const lastMessage = messages[messages.length - 1];
       if (lastMessage?.role === 'assistant') {
-        const content = lastMessage.parts
-          .filter((p) => p.type === 'text')
+        // Get text parts
+        const textParts = lastMessage.parts.filter((p) => p.type === 'text');
+
+        // Check if the last text part is still streaming
+        // The AI SDK sets state to 'streaming' during stream and 'done' when complete
+        const lastTextPart = textParts[textParts.length - 1] as { type: 'text'; text: string; state?: 'streaming' | 'done' } | undefined;
+        if (lastTextPart?.state === 'streaming') {
+          // Still streaming, don't check for completion yet
+          return;
+        }
+
+        const content = textParts
           .map((p) => p.text)
           .join('');
 
@@ -204,6 +214,8 @@ export function useAssessmentLogic(): [AssessmentState, AssessmentActions] {
           clearTimeout(timeoutRef.current);
           timeoutRef.current = null;
         }
+        // Always reset isSubmitting after message is sent (stream started)
+        setState((prev) => ({ ...prev, isSubmitting: false }));
       }
     },
     []
