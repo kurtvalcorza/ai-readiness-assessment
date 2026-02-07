@@ -22,13 +22,10 @@ describe('AssessmentComplete', () => {
 3. Deploy to production`;
 
   const mockOnStartNew = vi.fn();
-
   let mockWindowOpen: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     mockOnStartNew.mockClear();
-
-    // Mock window.open
     mockWindowOpen = vi.fn();
     vi.stubGlobal('open', mockWindowOpen);
   });
@@ -40,66 +37,48 @@ describe('AssessmentComplete', () => {
   describe('Rendering', () => {
     it('renders completion message', () => {
       render(<AssessmentComplete report={mockReport} onStartNew={mockOnStartNew} />);
-
       expect(screen.getByText('Assessment Complete!')).toBeInTheDocument();
       expect(screen.getByText(/Your AI readiness assessment has been completed/)).toBeInTheDocument();
     });
 
-    it('renders exactly two action buttons (HTML Preview and Print to PDF)', () => {
+    it('renders View Report button', () => {
       render(<AssessmentComplete report={mockReport} onStartNew={mockOnStartNew} />);
-
-      expect(screen.getByRole('button', { name: /Preview assessment report as styled HTML in new tab/i })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /Generate PDF version/i })).toBeInTheDocument();
-
-      // Verify no Markdown or HTML download buttons exist
-      expect(screen.queryByRole('button', { name: /Download assessment report as Markdown/i })).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: /Download assessment report as HTML/i })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /View assessment report/i })).toBeInTheDocument();
     });
 
     it('renders start new assessment button', () => {
       render(<AssessmentComplete report={mockReport} onStartNew={mockOnStartNew} />);
-
       expect(screen.getByRole('button', { name: /Start a new assessment/i })).toBeInTheDocument();
     });
 
-    it('renders help text describing HTML Preview and Print to PDF only', () => {
+    it('renders help text about Print to PDF', () => {
       render(<AssessmentComplete report={mockReport} onStartNew={mockOnStartNew} />);
-
-      expect(screen.getByText('Download Options:')).toBeInTheDocument();
-      expect(screen.getByText(/HTML Preview:/)).toBeInTheDocument();
-      expect(screen.getByText(/Print to PDF:/)).toBeInTheDocument();
-
-      // Verify no Markdown references
-      expect(screen.queryByText(/Markdown:/)).not.toBeInTheDocument();
+      expect(screen.getByText(/Opens your report in a new tab/)).toBeInTheDocument();
     });
   });
 
-  describe('HTML Preview', () => {
-    it('opens new window with HTML content when clicked', async () => {
+  describe('View Report', () => {
+    it('opens new window with HTML content including print button', async () => {
       const user = userEvent.setup();
       const mockPreviewWindow = {
-        document: {
-          write: vi.fn(),
-          close: vi.fn(),
-        },
+        document: { write: vi.fn(), close: vi.fn() },
         focus: vi.fn(),
       };
       mockWindowOpen.mockReturnValue(mockPreviewWindow);
 
       render(<AssessmentComplete report={mockReport} onStartNew={mockOnStartNew} />);
-
-      const previewButton = screen.getByRole('button', { name: /Preview assessment report as styled HTML in new tab/i });
-      await user.click(previewButton);
+      const viewButton = screen.getByRole('button', { name: /View assessment report/i });
+      await user.click(viewButton);
 
       expect(mockWindowOpen).toHaveBeenCalledWith('', '_blank');
       expect(mockPreviewWindow.document.write).toHaveBeenCalled();
       expect(mockPreviewWindow.document.close).toHaveBeenCalled();
       expect(mockPreviewWindow.focus).toHaveBeenCalled();
 
-      // Verify the written HTML contains expected structure
       const writtenHtml = mockPreviewWindow.document.write.mock.calls[0][0];
       expect(writtenHtml).toContain('AI Readiness Assessment Report');
-      expect(writtenHtml).toContain('<style>');
+      expect(writtenHtml).toContain('window.print()');
+      expect(writtenHtml).toContain('Print to PDF');
       expect(writtenHtml).toContain('class="header"');
       expect(writtenHtml).toContain('class="content"');
       expect(writtenHtml).toContain('class="footer"');
@@ -110,9 +89,8 @@ describe('AssessmentComplete', () => {
       mockWindowOpen.mockReturnValue(null);
 
       render(<AssessmentComplete report={mockReport} onStartNew={mockOnStartNew} />);
-
-      const previewButton = screen.getByRole('button', { name: /Preview assessment report as styled HTML in new tab/i });
-      await user.click(previewButton);
+      const viewButton = screen.getByRole('button', { name: /View assessment report/i });
+      await user.click(viewButton);
 
       await waitFor(() => {
         expect(screen.getByText(/Popup blocked/)).toBeInTheDocument();
@@ -123,103 +101,12 @@ describe('AssessmentComplete', () => {
       const user = userEvent.setup();
       render(<AssessmentComplete report="" onStartNew={mockOnStartNew} />);
 
-      const previewButton = screen.getByRole('button', { name: /Preview assessment report as styled HTML in new tab/i });
-      await user.click(previewButton);
+      const viewButton = screen.getByRole('button', { name: /View assessment report/i });
+      await user.click(viewButton);
 
       await waitFor(() => {
         expect(screen.getByText(/report content is invalid/i)).toBeInTheDocument();
       });
-    });
-  });
-
-  describe('PDF generation', () => {
-    it('opens print window for PDF generation', async () => {
-      const user = userEvent.setup();
-      const mockPrintWindow = {
-        document: {
-          write: vi.fn(),
-          close: vi.fn(),
-        },
-        focus: vi.fn(),
-        print: vi.fn(),
-        addEventListener: vi.fn(),
-      };
-      mockWindowOpen.mockReturnValue(mockPrintWindow);
-
-      render(<AssessmentComplete report={mockReport} onStartNew={mockOnStartNew} />);
-
-      const pdfButton = screen.getByRole('button', { name: /Generate PDF version/i });
-      await user.click(pdfButton);
-
-      await waitFor(() => {
-        expect(mockWindowOpen).toHaveBeenCalledWith(expect.stringContaining('blob:'), '_blank');
-      });
-    });
-
-    it('shows loading state during PDF generation', async () => {
-      const user = userEvent.setup();
-      const mockPrintWindow = {
-        document: {
-          write: vi.fn(),
-          close: vi.fn(),
-        },
-        focus: vi.fn(),
-        print: vi.fn(),
-      };
-      mockWindowOpen.mockReturnValue(mockPrintWindow);
-
-      render(<AssessmentComplete report={mockReport} onStartNew={mockOnStartNew} />);
-
-      const pdfButton = screen.getByRole('button', { name: /Generate PDF version/i });
-
-      // The loading state is very brief, so we just verify the button exists
-      expect(pdfButton).toBeInTheDocument();
-    });
-
-    it('shows error when popup is blocked', async () => {
-      const user = userEvent.setup();
-      mockWindowOpen.mockReturnValue(null); // Simulate popup blocked
-
-      render(<AssessmentComplete report={mockReport} onStartNew={mockOnStartNew} />);
-
-      const pdfButton = screen.getByRole('button', { name: /Generate PDF version/i });
-      await user.click(pdfButton);
-
-      await waitFor(() => {
-        expect(screen.getByText(/Please allow popups/)).toBeInTheDocument();
-      });
-    });
-
-    it('shows error when report is empty', async () => {
-      const user = userEvent.setup();
-      render(<AssessmentComplete report="" onStartNew={mockOnStartNew} />);
-
-      const pdfButton = screen.getByRole('button', { name: /Generate PDF version/i });
-      await user.click(pdfButton);
-
-      await waitFor(() => {
-        expect(screen.getByText(/report content is invalid/i)).toBeInTheDocument();
-      });
-    });
-
-    it('disables PDF button while loading', async () => {
-      const user = userEvent.setup();
-      const mockPrintWindow = {
-        document: {
-          write: vi.fn(),
-          close: vi.fn(),
-        },
-        focus: vi.fn(),
-        print: vi.fn(),
-      };
-      mockWindowOpen.mockReturnValue(mockPrintWindow);
-
-      render(<AssessmentComplete report={mockReport} onStartNew={mockOnStartNew} />);
-
-      const pdfButton = screen.getByRole('button', { name: /Generate PDF version/i });
-
-      // Button should be enabled initially
-      expect(pdfButton).not.toBeDisabled();
     });
   });
 
@@ -228,36 +115,21 @@ describe('AssessmentComplete', () => {
       const user = userEvent.setup();
       render(<AssessmentComplete report={mockReport} onStartNew={mockOnStartNew} />);
 
-      const newAssessmentButton = screen.getByRole('button', { name: /Start a new assessment/i });
-      await user.click(newAssessmentButton);
+      const newButton = screen.getByRole('button', { name: /Start a new assessment/i });
+      await user.click(newButton);
 
       expect(mockOnStartNew).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('Error handling', () => {
-    it('displays error alert when HTML Preview fails with popup blocked', async () => {
+    it('displays error alert and allows closing it', async () => {
       const user = userEvent.setup();
       mockWindowOpen.mockReturnValue(null);
 
       render(<AssessmentComplete report={mockReport} onStartNew={mockOnStartNew} />);
-
-      const previewButton = screen.getByRole('button', { name: /Preview assessment report as styled HTML in new tab/i });
-      await user.click(previewButton);
-
-      await waitFor(() => {
-        expect(screen.getByRole('alert')).toBeInTheDocument();
-      });
-    });
-
-    it('allows closing error alert', async () => {
-      const user = userEvent.setup();
-      mockWindowOpen.mockReturnValue(null);
-
-      render(<AssessmentComplete report={mockReport} onStartNew={mockOnStartNew} />);
-
-      const previewButton = screen.getByRole('button', { name: /Preview assessment report as styled HTML in new tab/i });
-      await user.click(previewButton);
+      const viewButton = screen.getByRole('button', { name: /View assessment report/i });
+      await user.click(viewButton);
 
       await waitFor(() => {
         expect(screen.getByRole('alert')).toBeInTheDocument();
@@ -275,22 +147,17 @@ describe('AssessmentComplete', () => {
   describe('Accessibility', () => {
     it('has proper region role and label', () => {
       render(<AssessmentComplete report={mockReport} onStartNew={mockOnStartNew} />);
-
-      const region = screen.getByRole('region', { name: /Assessment complete/i });
-      expect(region).toBeInTheDocument();
+      expect(screen.getByRole('region', { name: /Assessment complete/i })).toBeInTheDocument();
     });
 
     it('has descriptive aria-labels on all buttons', () => {
       render(<AssessmentComplete report={mockReport} onStartNew={mockOnStartNew} />);
-
-      expect(screen.getByRole('button', { name: /Preview assessment report as styled HTML in new tab/i })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /Generate PDF version/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /View assessment report/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /Start a new assessment/i })).toBeInTheDocument();
     });
 
     it('hides decorative icons from screen readers', () => {
       const { container } = render(<AssessmentComplete report={mockReport} onStartNew={mockOnStartNew} />);
-
       const hiddenIcons = container.querySelectorAll('[aria-hidden="true"]');
       expect(hiddenIcons.length).toBeGreaterThan(0);
     });

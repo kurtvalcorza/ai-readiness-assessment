@@ -1,8 +1,8 @@
 /**
- * Assessment completion component with download options
+ * Assessment completion component with report preview
  */
 
-import { FileText, RefreshCw, AlertCircle } from 'lucide-react';
+import { FileText, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 import { ErrorAlert } from './ErrorAlert';
 
@@ -12,8 +12,7 @@ interface AssessmentCompleteProps {
 }
 
 export function AssessmentComplete({ report, onStartNew }: AssessmentCompleteProps) {
-  const [pdfError, setPdfError] = useState('');
-  const [pdfLoading, setPdfLoading] = useState(false);
+  const [previewError, setPreviewError] = useState('');
 
   /**
    * Simple markdown to HTML converter
@@ -30,10 +29,8 @@ export function AssessmentComplete({ report, onStartNew }: AssessmentCompletePro
       .replace(/^\d+\. (.*$)/gim, '<li>$1</li>')
       .replace(/\n\n/gim, '</p><p>');
 
-    // Wrap consecutive list items in ul tags
     html = html.replace(/(<li>.*?<\/li>(\n<li>.*?<\/li>)*)/g, '<ul>$1</ul>');
-    
-    // Add paragraph tags
+
     html = html.split('\n').map(line => {
       if (line.trim() === '') return '';
       if (line.match(/^<[h1-6]|^<ul|^<\/ul/)) return line;
@@ -41,7 +38,6 @@ export function AssessmentComplete({ report, onStartNew }: AssessmentCompletePro
       return line.startsWith('<') ? line : `<p>${line}</p>`;
     }).join('\n');
 
-    // Clean up empty paragraphs and fix nesting
     html = html
       .replace(/<p><\/p>/g, '')
       .replace(/<p>(<[h1-6])/g, '$1')
@@ -53,15 +49,14 @@ export function AssessmentComplete({ report, onStartNew }: AssessmentCompletePro
   };
 
   /**
-   * Opens a clean, styled HTML report preview in a new browser tab (no file download)
+   * Opens a styled HTML report preview with a Print to PDF button
    */
-  const htmlPreview = (): void => {
-    setPdfError('');
+  const viewReport = (): void => {
+    setPreviewError('');
 
     try {
-      // Validate report content
       if (!report || report.trim().length === 0) {
-        setPdfError('The report content is invalid.');
+        setPreviewError('The report content is invalid.');
         return;
       }
 
@@ -73,14 +68,18 @@ export function AssessmentComplete({ report, onStartNew }: AssessmentCompletePro
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Readiness Assessment Report</title>
     <style>
-        body { 
-            font-family: Arial, sans-serif; 
-            line-height: 1.6; 
-            max-width: 800px; 
-            margin: 0 auto; 
-            padding: 20px; 
+        @media print {
+            body { margin: 0; font-size: 12pt; }
+            .no-print { display: none !important; }
         }
-        h1, h2, h3, h4 { color: #1e40af; }
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1, h2, h3, h4 { color: #1e40af; page-break-after: avoid; }
         h1 { border-bottom: 2px solid #1e40af; padding-bottom: 10px; }
         h2 { border-bottom: 1px solid #ddd; padding-bottom: 5px; }
         ul, ol { padding-left: 20px; }
@@ -88,9 +87,34 @@ export function AssessmentComplete({ report, onStartNew }: AssessmentCompletePro
         .header { text-align: center; margin-bottom: 30px; }
         .content { margin-bottom: 30px; }
         .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 0.9em; color: #666; }
+        .toolbar {
+            background: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 12px 20px;
+            margin: -20px -20px 20px -20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .print-btn {
+            background: #7c3aed;
+            color: white;
+            padding: 8px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .print-btn:hover { background: #6d28d9; }
+        .print-hint { color: #64748b; font-size: 13px; }
     </style>
 </head>
 <body>
+    <div class="no-print toolbar">
+        <button class="print-btn" onclick="window.print()">Print to PDF</button>
+        <span class="print-hint">Select "Save as PDF" as the printer destination</span>
+    </div>
     <div class="header">
         <h1>AI Readiness Assessment Report</h1>
         <p>Generated on ${new Date().toLocaleDateString()}</p>
@@ -106,7 +130,7 @@ export function AssessmentComplete({ report, onStartNew }: AssessmentCompletePro
 
       const previewWindow = window.open('', '_blank');
       if (!previewWindow) {
-        setPdfError('Popup blocked. Please allow popups for this site and try again.');
+        setPreviewError('Popup blocked. Please allow popups for this site and try again.');
         return;
       }
 
@@ -114,126 +138,17 @@ export function AssessmentComplete({ report, onStartNew }: AssessmentCompletePro
       previewWindow.document.close();
       previewWindow.focus();
     } catch {
-      setPdfError('Failed to preview report. Please try again.');
+      setPreviewError('Failed to open report preview. Please try again.');
     }
   };
-
-  /**
-   * Generates and downloads the report as a PDF (simplified approach)
-   */
-  const downloadPDF = async () => {
-    setPdfLoading(true);
-    setPdfError('');
-
-    try {
-      if (!report || report.trim().length === 0) {
-        throw new Error('Report content is empty');
-      }
-
-      const htmlContent = `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AI Readiness Assessment Report</title>
-<style>
-@media print {
-  body { margin: 0; font-size: 12pt; }
-  .no-print { display: none !important; }
-}
-body {
-  font-family: Arial, sans-serif;
-  line-height: 1.6;
-  max-width: 800px;
-  margin: 0 auto;
-  padding: 20px;
-}
-h1, h2, h3, h4 { color: #1e40af; page-break-after: avoid; }
-h1 { border-bottom: 2px solid #1e40af; padding-bottom: 10px; }
-h2 { border-bottom: 1px solid #ddd; padding-bottom: 5px; }
-ul, ol { padding-left: 20px; }
-strong { color: #1e3a8a; }
-.header { text-align: center; margin-bottom: 30px; }
-.footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 0.9em; color: #666; }
-.print-button {
-  background: #1e40af;
-  color: white;
-  padding: 10px 20px;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  margin: 20px 0;
-  font-size: 16px;
-}
-.print-button:hover { background: #1e3a8a; }
-.print-button:active { background: #172554; }
-</style>
-</head>
-<body>
-<div class="no-print">
-  <button class="print-button" onclick="window.print()">Print to PDF</button>
-  <p><em>Use your browser's print function and select "Save as PDF" as the destination.</em></p>
-</div>
-<div class="header">
-  <h1>AI Readiness Assessment Report</h1>
-  <p>Generated on ${new Date().toLocaleDateString()}</p>
-</div>
-<div class="content">
-  ${convertMarkdownToHTML(report)}
-</div>
-<div class="footer">
-  <p>This report was generated by the DOST-ASTI AI Readiness Assessment Tool.</p>
-</div>
-<script>
-window.onload = function() { setTimeout(function() { window.print(); }, 300); };
-</script>
-</body>
-</html>`;
-
-      // Use Blob URL so the new window loads a real document where
-      // inline scripts and the load event fire reliably.
-      const blob = new Blob([htmlContent], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
-      const printWindow = window.open(url, '_blank');
-
-      if (!printWindow) {
-        URL.revokeObjectURL(url);
-        throw new Error('Popup blocked. Please allow popups and try again.');
-      }
-
-      // Clean up the Blob URL after the window loads
-      printWindow.addEventListener('afterprint', () => URL.revokeObjectURL(url));
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
-
-    } catch (error) {
-      console.error('Error generating PDF:', error);
-      let errorMessage = 'Failed to generate PDF. ';
-
-      if (error instanceof Error) {
-        if (error.message.includes('Popup blocked')) {
-          errorMessage += 'Please allow popups for this site and try again.';
-        } else if (error.message.includes('empty')) {
-          errorMessage += 'The report content is invalid.';
-        } else {
-          errorMessage += error.message;
-        }
-      }
-
-      errorMessage += ' You can try the HTML Preview option instead.';
-      setPdfError(errorMessage);
-    } finally {
-      setPdfLoading(false);
-    }
-  };
-
 
   return (
     <div className="space-y-4" role="region" aria-label="Assessment complete">
-      {pdfError && (
-        <ErrorAlert 
-          message={pdfError} 
+      {previewError && (
+        <ErrorAlert
+          message={previewError}
           severity="warning"
-          onClose={() => setPdfError('')} 
+          onClose={() => setPreviewError('')}
         />
       )}
 
@@ -242,48 +157,22 @@ window.onload = function() { setTimeout(function() { window.print(); }, 300); };
         <p className="text-gray-700 mb-4">
           Your AI readiness assessment has been completed. Preview or save your report below.
         </p>
-        
+
         <div className="flex justify-center gap-3 flex-wrap mb-4">
           <button
-            onClick={htmlPreview}
+            onClick={viewReport}
             className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition flex items-center gap-2 font-medium shadow-sm"
-            aria-label="Preview assessment report as styled HTML in new tab"
+            aria-label="View assessment report in new tab with option to print as PDF"
           >
             <FileText size={20} aria-hidden="true" />
-            HTML Preview
-          </button>
-          
-          <button
-            onClick={downloadPDF}
-            disabled={pdfLoading}
-            className="bg-purple-600 text-white px-6 py-3 rounded-xl hover:bg-purple-700 transition flex items-center gap-2 font-medium shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-            aria-label="Generate PDF version (opens print dialog)"
-          >
-            {pdfLoading ? (
-              <>
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                Generating...
-              </>
-            ) : (
-              <>
-                <FileText size={20} aria-hidden="true" />
-                Print to PDF
-              </>
-            )}
+            View Report
           </button>
         </div>
 
         <div className="text-sm text-gray-600 mb-4 p-3 bg-blue-50 rounded-lg">
-          <div className="flex items-start gap-2">
-            <AlertCircle size={16} className="text-blue-600 mt-0.5 flex-shrink-0" />
-            <div className="text-left">
-              <p className="font-medium text-blue-800">Download Options:</p>
-              <ul className="mt-1 space-y-1 text-blue-700">
-                <li>• <strong>HTML Preview:</strong> Opens a clean, styled report preview in a new browser tab</li>
-                <li>• <strong>Print to PDF:</strong> Opens browser print dialog for direct PDF creation</li>
-              </ul>
-            </div>
-          </div>
+          <p className="text-blue-700">
+            Opens your report in a new tab. Use the <strong>Print to PDF</strong> button there to save as PDF.
+          </p>
         </div>
 
         <button
