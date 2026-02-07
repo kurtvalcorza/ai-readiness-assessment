@@ -142,6 +142,7 @@ describe('AssessmentComplete', () => {
         },
         focus: vi.fn(),
         print: vi.fn(),
+        addEventListener: vi.fn(),
       };
       mockWindowOpen.mockReturnValue(mockPrintWindow);
 
@@ -151,7 +152,7 @@ describe('AssessmentComplete', () => {
       await user.click(pdfButton);
 
       await waitFor(() => {
-        expect(mockWindowOpen).toHaveBeenCalledWith('', '_blank');
+        expect(mockWindowOpen).toHaveBeenCalledWith(expect.stringContaining('blob:'), '_blank');
       });
     });
 
