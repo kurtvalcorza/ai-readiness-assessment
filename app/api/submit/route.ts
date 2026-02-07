@@ -5,7 +5,7 @@
 
 import { checkSubmissionRateLimit } from '@/lib/rate-limit';
 import { validateAssessmentData } from '@/lib/validation';
-import { signWebhookPayload } from '@/lib/webhook-signing';
+import { signWebhookRequest } from '@/lib/webhook-signing';
 import { MAX_ORGANIZATION_LENGTH, MAX_DOMAIN_LENGTH } from '@/lib/constants';
 import { AssessmentData, GoogleSheetsData, APISuccess, APIError } from '@/lib/types';
 
@@ -48,7 +48,7 @@ export async function POST(req: Request): Promise<Response> {
       const error: APIError = { error: 'Field values exceed maximum length' };
       return new Response(JSON.stringify(error), {
         status: 400,
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'X-Content-Type-Options': 'nosniff',
           'X-Frame-Options': 'DENY',
@@ -68,7 +68,7 @@ export async function POST(req: Request): Promise<Response> {
       };
       return new Response(JSON.stringify(success), {
         status: 200,
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'X-Content-Type-Options': 'nosniff',
           'X-Frame-Options': 'DENY',
@@ -91,15 +91,17 @@ export async function POST(req: Request): Promise<Response> {
     // Submit to Google Sheets via webhook
     const signingSecret = process.env.WEBHOOK_SIGNING_SECRET;
     let body: string;
+    let targetUrl = webhookUrl;
 
-    // Embed HMAC signature in the payload if signing secret is configured
     if (signingSecret) {
-      body = signWebhookPayload(formattedData, signingSecret);
+      const signed = signWebhookRequest(formattedData, signingSecret);
+      body = signed.body;
+      targetUrl = webhookUrl + signed.queryParams;
     } else {
       body = JSON.stringify(formattedData);
     }
 
-    const response = await fetch(webhookUrl, {
+    const response = await fetch(targetUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body,
@@ -109,13 +111,18 @@ export async function POST(req: Request): Promise<Response> {
       throw new Error(`Google Sheets submission failed: ${response.statusText}`);
     }
 
+    const result = await response.json();
+    if (!result.success) {
+      throw new Error(`Google Sheets script error: ${result.error || 'Unknown error'}`);
+    }
+
     const success: APISuccess = {
       success: true,
       message: 'Assessment submitted successfully',
     };
     return new Response(JSON.stringify(success), {
       status: 200,
-      headers: { 
+      headers: {
         'Content-Type': 'application/json',
         'X-Content-Type-Options': 'nosniff',
         'X-Frame-Options': 'DENY',
@@ -141,7 +148,7 @@ export async function POST(req: Request): Promise<Response> {
     const apiError: APIError = { error: clientMessage };
     return new Response(JSON.stringify(apiError), {
       status: safeMessages.some((msg) => error.message?.includes(msg)) ? 400 : 500,
-      headers: { 
+      headers: {
         'Content-Type': 'application/json',
         'X-Content-Type-Options': 'nosniff',
         'X-Frame-Options': 'DENY',

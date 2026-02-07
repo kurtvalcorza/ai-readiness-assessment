@@ -261,9 +261,10 @@ Before storing conversation data in Google Sheets, the following sanitization is
 ### Webhook Security Considerations
 - Webhook URL should be treated as sensitive
 - HMAC-SHA256 signature verification available via `WEBHOOK_SIGNING_SECRET` env var
-- Signed message format: `${timestamp}.${body}` — prevents replay attacks (5-minute window)
-- Signature and timestamp embedded in JSON body (`_webhookSignature`, `_webhookTimestamp`) since Apps Script cannot access custom HTTP headers
-- Verification logic provided in Google Apps Script `doPost` (see README.md / DEPLOYMENT.md)
+- Signed message format: `${timestamp}.${rawBody}` — prevents replay attacks (5-minute window)
+- Signature (`_sig`) and timestamp (`_ts`) sent as URL query parameters (Apps Script reads via `e.parameter`)
+- HMAC verified against `e.postData.contents` (raw HTTP body) to avoid JSON serialization mismatches
+- Verification logic provided in Google Apps Script `doPost` (see DEPLOYMENT.md)
 - Backwards compatible: unsigned requests still work if secret is not configured
 - Optional feature (app works without it)
 - Sanitized data sent (no raw user input)
