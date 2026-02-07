@@ -354,9 +354,7 @@ export async function submitAssessment(
 7. Completion UI
    │
    └─> AssessmentComplete component
-       ├─> Download Markdown
-       ├─> Download HTML
-       └─> Print to PDF
+       └─> View Report (HTML preview in new tab)
 ```
 
 ### State Management Flow

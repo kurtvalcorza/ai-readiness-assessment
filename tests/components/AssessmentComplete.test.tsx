@@ -51,7 +51,7 @@ describe('AssessmentComplete', () => {
       expect(screen.getByRole('button', { name: /Start a new assessment/i })).toBeInTheDocument();
     });
 
-    it('renders help text about Print to PDF', () => {
+    it('renders help text about saving report', () => {
       render(<AssessmentComplete report={mockReport} onStartNew={mockOnStartNew} />);
       expect(screen.getByText(/Opens your report in a new tab/)).toBeInTheDocument();
     });
@@ -78,7 +78,7 @@ describe('AssessmentComplete', () => {
       const writtenHtml = mockPreviewWindow.document.write.mock.calls[0][0];
       expect(writtenHtml).toContain('AI Readiness Assessment Report');
       expect(writtenHtml).toContain('window.print()');
-      expect(writtenHtml).toContain('Print to PDF');
+      expect(writtenHtml).toContain('Print</button>');
       expect(writtenHtml).toContain('class="header"');
       expect(writtenHtml).toContain('class="content"');
       expect(writtenHtml).toContain('class="footer"');

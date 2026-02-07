@@ -49,7 +49,7 @@ export function AssessmentComplete({ report, onStartNew }: AssessmentCompletePro
   };
 
   /**
-   * Opens a styled HTML report preview with a Print to PDF button
+   * Opens a styled HTML report preview in a new tab
    */
   const viewReport = (): void => {
     setPreviewError('');
@@ -112,8 +112,8 @@ export function AssessmentComplete({ report, onStartNew }: AssessmentCompletePro
 </head>
 <body>
     <div class="no-print toolbar">
-        <button class="print-btn" onclick="window.print()">Print to PDF</button>
-        <span class="print-hint">Select "Save as PDF" as the printer destination</span>
+        <button class="print-btn" onclick="window.print()">Print</button>
+        <span class="print-hint">Select "Save as PDF" as the printer destination to save as PDF</span>
     </div>
     <div class="header">
         <h1>AI Readiness Assessment Report</h1>
@@ -155,7 +155,7 @@ export function AssessmentComplete({ report, onStartNew }: AssessmentCompletePro
       <div className="p-6 bg-green-50 border-2 border-green-300 rounded-xl text-center">
         <h2 className="text-xl font-bold text-green-800 mb-2">Assessment Complete!</h2>
         <p className="text-gray-700 mb-4">
-          Your AI readiness assessment has been completed. Preview or save your report below.
+          Your AI readiness assessment has been completed. Preview your report in HTML to save or print your report below.
         </p>
 
         <div className="flex justify-center gap-3 flex-wrap mb-4">
@@ -171,7 +171,7 @@ export function AssessmentComplete({ report, onStartNew }: AssessmentCompletePro
 
         <div className="text-sm text-gray-600 mb-4 p-3 bg-blue-50 rounded-lg">
           <p className="text-blue-700">
-            Opens your report in a new tab. Use the <strong>Print to PDF</strong> button there to save as PDF.
+            Opens your report in a new tab where you can save or print it using your browser.
           </p>
         </div>
 
