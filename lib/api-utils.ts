@@ -17,6 +17,7 @@ export interface ResponseOptions {
 export interface ErrorOptions extends ResponseOptions {
   code?: string;
   logError?: boolean;
+  sanitize?: boolean; // Whether to sanitize 500 errors
 }
 
 /**
@@ -56,14 +57,16 @@ export function createJsonResponse<T>(
  * Create a standardized error response with security headers
  * Sanitizes error messages and logs internal errors
  * @param error - Error object or error message string
- * @param options - Optional status code, error code, and logging flag
+ * @param status - HTTP status code
+ * @param options - Optional error code, logging flag, sanitization flag, and additional headers
  * @returns Response object with error message and security headers
  */
 export function createErrorResponse(
   error: Error | string,
-  options: ErrorOptions = {}
+  status: number = 500,
+  options: Omit<ErrorOptions, 'status'> = {}
 ): Response {
-  const { status = 500, code, logError = true, headers = {} } = options;
+  const { code, logError = true, sanitize = true, headers = {} } = options;
 
   // Extract error message
   const message = typeof error === 'string' ? error : error.message;
@@ -73,8 +76,8 @@ export function createErrorResponse(
     console.error('API error:', error);
   }
 
-  // Sanitize error message for client
-  const clientMessage = status >= 500 ? 'Internal server error' : message;
+  // Sanitize error message for client (only if sanitize is true and status >= 500)
+  const clientMessage = sanitize && status >= 500 ? 'Internal server error' : message;
 
   return new Response(
     JSON.stringify({

@@ -5,9 +5,10 @@
 
 import { checkSubmissionRateLimit } from '@/lib/rate-limit';
 import { validateAssessmentData } from '@/lib/validation';
-import { signWebhookPayload } from '@/lib/webhook-signing';
+import { createJsonResponse, createErrorResponse } from '@/lib/api-utils';
+import { submitAssessment } from '@/services/submissionService';
 import { MAX_ORGANIZATION_LENGTH, MAX_DOMAIN_LENGTH } from '@/lib/constants';
-import { AssessmentData, GoogleSheetsData, APISuccess, APIError } from '@/lib/types';
+import { AssessmentData } from '@/lib/types';
 
 export const maxDuration = 30;
 
@@ -21,18 +22,11 @@ export async function POST(req: Request): Promise<Response> {
     // Rate limiting check
     const rateLimit = await checkSubmissionRateLimit(req);
     if (!rateLimit.allowed) {
-      const error: APIError = {
-        error: 'Too many submissions. Please wait a few minutes before submitting again.',
-      };
-      return new Response(JSON.stringify(error), {
-        status: 429,
-        headers: {
-          'Content-Type': 'application/json',
-          'Retry-After': '300',
-          'X-Content-Type-Options': 'nosniff',
-          'X-Frame-Options': 'DENY',
-        },
-      });
+      return createErrorResponse(
+        'Too many submissions. Please wait a few minutes before submitting again.',
+        429,
+        { 'Retry-After': '300' }
+      );
     }
 
     const data: AssessmentData = await req.json();
@@ -45,86 +39,25 @@ export async function POST(req: Request): Promise<Response> {
       data.organization.length > MAX_ORGANIZATION_LENGTH ||
       data.domain.length > MAX_DOMAIN_LENGTH
     ) {
-      const error: APIError = { error: 'Field values exceed maximum length' };
-      return new Response(JSON.stringify(error), {
-        status: 400,
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Content-Type-Options': 'nosniff',
-          'X-Frame-Options': 'DENY',
-        },
-      });
+      return createErrorResponse('Field values exceed maximum length', 400);
     }
 
-    // Get Google Sheets webhook URL from environment
-    const webhookUrl = process.env.GOOGLE_SHEETS_WEBHOOK_URL;
-
-    if (!webhookUrl) {
-      console.warn('Google Sheets webhook URL not configured');
-      // Don't fail - just skip submission
-      const success: APISuccess = {
-        success: true,
-        message: 'Data received (webhook not configured)',
-      };
-      return new Response(JSON.stringify(success), {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Content-Type-Options': 'nosniff',
-          'X-Frame-Options': 'DENY',
-        },
-      });
-    }
-
-    // Format data for Google Sheets
-    const formattedData: GoogleSheetsData = {
-      timestamp: data.timestamp,
-      organization: data.organization,
-      domain: data.domain,
-      readinessLevel: data.readinessLevel,
-      primarySolution: data.solutions[0]?.category || '',
-      secondarySolution: data.solutions[1]?.category || '',
-      nextSteps: data.nextSteps.join('; '),
-      conversationHistory: data.conversationHistory || '',
-    };
-
-    // Submit to Google Sheets via webhook
-    const signingSecret = process.env.WEBHOOK_SIGNING_SECRET;
-    let body: string;
-
-    if (signingSecret) {
-      body = signWebhookPayload(formattedData, signingSecret);
-    } else {
-      body = JSON.stringify(formattedData);
-    }
-
-    const response = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body,
+    // Submit to Google Sheets
+    const result = await submitAssessment(data, {
+      webhookUrl: process.env.GOOGLE_SHEETS_WEBHOOK_URL,
+      signingSecret: process.env.WEBHOOK_SIGNING_SECRET,
     });
 
-    if (!response.ok) {
-      throw new Error(`Google Sheets submission failed: ${response.statusText}`);
-    }
-
-    const result = await response.json();
     if (!result.success) {
-      throw new Error(`Google Sheets script error: ${result.error || 'Unknown error'}`);
+      // Check if it's a Google Sheets script error (should be surfaced to client)
+      if (result.error?.includes('Google Sheets script error')) {
+        return createErrorResponse(result.error, 400);
+      }
+      // All other errors are internal (network, etc.) - use custom message without sanitization
+      return createErrorResponse('Submission failed. Please try again.', 500, { sanitize: false });
     }
 
-    const success: APISuccess = {
-      success: true,
-      message: 'Assessment submitted successfully',
-    };
-    return new Response(JSON.stringify(success), {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Content-Type-Options': 'nosniff',
-        'X-Frame-Options': 'DENY',
-      },
-    });
+    return createJsonResponse({ success: true, message: result.message }, 200);
   } catch (error: any) {
     console.error('Submit API error:', error);
 
@@ -143,14 +76,7 @@ export async function POST(req: Request): Promise<Response> {
       ? error.message
       : 'Submission failed. Please try again.';
 
-    const apiError: APIError = { error: clientMessage };
-    return new Response(JSON.stringify(apiError), {
-      status: safeMessages.some((msg) => error.message?.includes(msg)) ? 400 : 500,
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Content-Type-Options': 'nosniff',
-        'X-Frame-Options': 'DENY',
-      },
-    });
+    const status = safeMessages.some((msg) => error.message?.includes(msg)) ? 400 : 500;
+    return createErrorResponse(clientMessage, status);
   }
 }
