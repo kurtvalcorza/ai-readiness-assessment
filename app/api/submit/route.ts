@@ -94,7 +94,7 @@ export async function POST(req: Request): Promise<Response> {
 
     // Embed HMAC signature in the payload if signing secret is configured
     if (signingSecret) {
-      body = signWebhookPayload(formattedData as Record<string, unknown>, signingSecret);
+      body = signWebhookPayload(formattedData, signingSecret);
     } else {
       body = JSON.stringify(formattedData);
     }

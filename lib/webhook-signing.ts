@@ -29,7 +29,7 @@ export function createWebhookSignature(
  * Returns a new JSON string with _webhookSignature and _webhookTimestamp added.
  */
 export function signWebhookPayload(
-  data: Record<string, unknown>,
+  data: object,
   secret: string
 ): string {
   // Signature is computed over the original data (without signature fields)
