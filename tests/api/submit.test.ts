@@ -81,7 +81,7 @@ describe('/api/submit', () => {
     });
 
     const response = await POST(request);
-    expect(response.status).toBe(500);
+    expect(response.status).toBe(400);
 
     const data = await response.json();
     expect(data.error).toBe('Invalid organization field');
@@ -150,7 +150,7 @@ describe('/api/submit', () => {
     );
   });
 
-  it('handles Google Sheets submission failure', async () => {
+  it('does not leak internal details on Google Sheets failure', async () => {
     process.env.GOOGLE_SHEETS_WEBHOOK_URL = 'https://script.google.com/test';
     mockFetch.mockResolvedValue({
       ok: false,
@@ -167,7 +167,9 @@ describe('/api/submit', () => {
     expect(response.status).toBe(500);
 
     const data = await response.json();
-    expect(data.error).toContain('Google Sheets submission failed');
+    // Should NOT leak upstream service details
+    expect(data.error).toBe('Submission failed. Please try again.');
+    expect(data.error).not.toContain('Google Sheets');
   });
 
   it('formats data correctly for Google Sheets', async () => {
@@ -208,7 +210,7 @@ describe('/api/submit', () => {
     expect(response.headers.get('X-Frame-Options')).toBe('DENY');
   });
 
-  it('handles network errors gracefully', async () => {
+  it('does not leak network errors to client', async () => {
     process.env.GOOGLE_SHEETS_WEBHOOK_URL = 'https://script.google.com/test';
     mockFetch.mockRejectedValue(new Error('Network error'));
 
@@ -222,6 +224,8 @@ describe('/api/submit', () => {
     expect(response.status).toBe(500);
 
     const data = await response.json();
-    expect(data.error).toContain('Network error');
+    // Should NOT leak internal network error details
+    expect(data.error).toBe('Submission failed. Please try again.');
+    expect(data.error).not.toContain('Network error');
   });
 });

@@ -114,9 +114,24 @@ export async function POST(req: Request): Promise<Response> {
     });
   } catch (error: any) {
     console.error('Submit API error:', error);
-    const apiError: APIError = { error: error.message || 'Submission failed' };
+
+    // Only surface known validation errors to the client
+    const safeMessages = [
+      'Invalid organization field',
+      'Invalid domain field',
+      'Invalid readinessLevel field',
+      'Solutions must be an array',
+      'Next steps must be an array',
+      'Invalid solution structure',
+      'Field values exceed maximum length',
+    ];
+    const clientMessage = safeMessages.find((msg) => error.message?.includes(msg))
+      ? error.message
+      : 'Submission failed. Please try again.';
+
+    const apiError: APIError = { error: clientMessage };
     return new Response(JSON.stringify(apiError), {
-      status: 500,
+      status: safeMessages.some((msg) => error.message?.includes(msg)) ? 400 : 500,
       headers: { 
         'Content-Type': 'application/json',
         'X-Content-Type-Options': 'nosniff',

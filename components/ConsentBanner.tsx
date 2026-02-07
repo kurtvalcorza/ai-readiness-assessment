@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { X, Shield } from 'lucide-react';
+import { hasConsentChoice } from '@/lib/consent';
 
 interface ConsentBannerProps {
   onAccept: () => void;
@@ -17,9 +18,8 @@ export function ConsentBanner({ onAccept, onDecline }: ConsentBannerProps) {
   const [isClosing, setIsClosing] = useState(false);
 
   useEffect(() => {
-    // Check if user has already made a choice
-    const consent = localStorage.getItem('ai-assessment-consent');
-    if (!consent) {
+    // Check if user has already made a choice (using consent utility)
+    if (!hasConsentChoice()) {
       // Show banner after a short delay for better UX
       setTimeout(() => setIsVisible(true), 1000);
     }
@@ -42,10 +42,8 @@ export function ConsentBanner({ onAccept, onDecline }: ConsentBannerProps) {
   };
 
   const handleClose = () => {
-    setIsClosing(true);
-    setTimeout(() => {
-      setIsVisible(false);
-    }, 300);
+    // Closing without choosing counts as decline
+    handleDecline();
   };
 
   if (!isVisible) return null;

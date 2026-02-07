@@ -40,6 +40,7 @@ describe('/api/chat', () => {
     (checkChatRateLimit as any).mockResolvedValue({ allowed: true, remaining: 29 });
     (validateEnv as any).mockReturnValue(undefined);
     (validateMessageContent as any).mockReturnValue(undefined);
+    (detectPromptInjection as any).mockReturnValue([]);
   });
 
   afterEach(() => {
@@ -95,7 +96,7 @@ describe('/api/chat', () => {
     expect(data.error).toContain('Too many messages');
   });
 
-  it('returns 500 for message too long', async () => {
+  it('returns 400 for message too long', async () => {
     const longMessage = 'a'.repeat(2001);
     const messages = [
       {
@@ -111,7 +112,7 @@ describe('/api/chat', () => {
     });
 
     const response = await POST(request);
-    expect(response.status).toBe(500);
+    expect(response.status).toBe(400);
 
     const data = await response.json();
     expect(data.error).toContain('exceeds maximum length');
@@ -140,7 +141,7 @@ describe('/api/chat', () => {
     expect(data.error).toContain('security risk');
   });
 
-  it('validates message content', async () => {
+  it('does not leak internal error details to client', async () => {
     (validateMessageContent as any).mockImplementation(() => {
       throw new Error('Invalid content');
     });
@@ -162,7 +163,8 @@ describe('/api/chat', () => {
     expect(response.status).toBe(500);
 
     const data = await response.json();
-    expect(data.error).toBe('Invalid content');
+    // Should NOT leak the internal error message
+    expect(data.error).toBe('An internal error occurred. Please try again.');
   });
 
   it('processes valid messages successfully', async () => {

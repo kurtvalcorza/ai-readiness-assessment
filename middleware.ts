@@ -65,7 +65,6 @@ export function middleware(request: NextRequest) {
     connect-src 'self' https://generativelanguage.googleapis.com https://script.google.com https://va.vercel-scripts.com https://vitals.vercel-insights.com;
     worker-src 'self' blob:;
     upgrade-insecure-requests;
-    block-all-mixed-content;
     report-uri /api/csp-report;
   `.replace(/\s{2,}/g, ' ').trim();
 
@@ -73,9 +72,10 @@ export function middleware(request: NextRequest) {
   response.headers.set('Content-Security-Policy', cspHeader);
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   response.headers.set('X-Content-Type-Options', 'nosniff');
+  response.headers.set('X-Frame-Options', 'SAMEORIGIN');
   response.headers.set('X-DNS-Prefetch-Control', 'false');
   response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
-  response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), interest-cohort=()');
+  response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), interest-cohort=(), payment=(), usb=(), bluetooth=(), serial=()');
   
   // Store nonce in response header for debugging (optional, remove in production if needed)
   if (isDev) {

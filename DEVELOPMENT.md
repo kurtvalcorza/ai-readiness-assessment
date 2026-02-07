@@ -259,8 +259,8 @@ npm run lint -- --fix
 
 **Solution**:
 - Check browser console for errors
-- Ensure html2pdf.js is installed
-- Try Markdown download as fallback
+- Ensure popups are allowed (PDF uses browser print dialog)
+- Try Markdown or HTML download as fallback
 
 ## Contributing
 

@@ -1,11 +1,35 @@
 /**
  * CSP Violation Reporting Endpoint
  * Logs Content Security Policy violations for monitoring and debugging
+ * 
+ * Rate limited to prevent abuse (100 reports per minute per IP)
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 
 export const runtime = 'edge';
+
+/** Simple in-memory rate limiter for CSP reports (Edge-compatible) */
+const reportCounts = new Map<string, { count: number; resetTime: number }>();
+const CSP_RATE_LIMIT = 100; // max reports per window
+const CSP_RATE_WINDOW = 60000; // 1 minute
+
+function checkCspRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const record = reportCounts.get(ip);
+
+  if (!record || now > record.resetTime) {
+    reportCounts.set(ip, { count: 1, resetTime: now + CSP_RATE_WINDOW });
+    return true;
+  }
+
+  if (record.count >= CSP_RATE_LIMIT) {
+    return false;
+  }
+
+  record.count++;
+  return true;
+}
 
 interface CSPReport {
   'csp-report': {
@@ -25,6 +49,14 @@ interface CSPReport {
  */
 export async function POST(req: NextRequest) {
   try {
+    // Rate limit CSP reports to prevent flooding
+    const forwarded = req.headers.get('x-forwarded-for');
+    const ip = forwarded ? forwarded.split(',')[0].trim() : 'unknown';
+
+    if (!checkCspRateLimit(ip)) {
+      return new Response(null, { status: 429 });
+    }
+
     const report: CSPReport = await req.json();
     const violation = report['csp-report'];
 
@@ -37,38 +69,11 @@ export async function POST(req: NextRequest) {
       lineNumber: violation['line-number'],
       columnNumber: violation['column-number'],
       timestamp: new Date().toISOString(),
-      userAgent: req.headers.get('user-agent'),
     });
 
-    // In production, you might want to:
-    // 1. Send to monitoring service (Sentry, LogRocket, etc.)
-    // 2. Store in database for analysis
-    // 3. Alert on repeated violations
-    // 4. Track violation patterns
-
-    // Example: Send to external monitoring (uncomment if using Sentry)
-    // if (process.env.SENTRY_DSN) {
-    //   Sentry.captureMessage('CSP Violation', {
-    //     level: 'warning',
-    //     extra: violation,
-    //   });
-    // }
-
-    return new Response('OK', { status: 204 });
+    return new Response(null, { status: 204 });
   } catch (error) {
     console.error('Error processing CSP report:', error);
-    return new Response('Error', { status: 500 });
+    return new Response(null, { status: 400 });
   }
-}
-
-/**
- * GET handler - returns information about CSP reporting
- */
-export async function GET() {
-  return NextResponse.json({
-    endpoint: '/api/csp-report',
-    purpose: 'Content Security Policy violation reporting',
-    method: 'POST',
-    note: 'This endpoint receives CSP violation reports from the browser',
-  });
 }

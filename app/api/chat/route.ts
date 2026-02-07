@@ -115,10 +115,20 @@ export async function POST(req: Request) {
   } catch (error: any) {
     console.error('Chat API error:', error);
 
+    // Determine safe client-facing message based on known validation errors
+    const safeMessages = [
+      'Message exceeds maximum length',
+      'Your message contains patterns that may indicate a security risk',
+      'Invalid input detected',
+    ];
+    const clientMessage = safeMessages.find((msg) => error.message?.includes(msg))
+      ? error.message
+      : 'An internal error occurred. Please try again.';
+
     return new Response(
-      JSON.stringify({ error: error.message || 'An internal error occurred.' }),
+      JSON.stringify({ error: clientMessage }),
       { 
-        status: 500, 
+        status: error.message?.includes('maximum length') || error.message?.includes('Invalid input') ? 400 : 500, 
         headers: { 
           'Content-Type': 'application/json',
           'X-Content-Type-Options': 'nosniff',

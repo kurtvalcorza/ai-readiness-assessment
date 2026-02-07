@@ -10,9 +10,16 @@ The application implements multiple layers of security controls at both the fron
 - ✅ Privacy consent banner with user control
 - ✅ Hardened Content Security Policy (CSP) with nonce-based scripts
 - ✅ Environment-based security configuration
-- ✅ CSP violation reporting
+- ✅ CSP violation reporting with rate limiting
 - ✅ Fixed CSP regression (removed unsafe-inline/unsafe-eval in production)
 - ✅ Updated Next.js to 16.1.6 (patched DoS vulnerabilities)
+- ✅ Sanitized API error responses (no internal details leaked to clients)
+- ✅ Removed unused html2pdf.js dependency (eliminated jspdf CVEs + html2pdf.js XSS)
+- ✅ Removed CSP report GET handler (information disclosure)
+- ✅ Added X-Frame-Options header in middleware
+- ✅ Expanded Permissions-Policy (payment, usb, bluetooth, serial)
+- ✅ Removed deprecated block-all-mixed-content CSP directive
+- ✅ Consent banner close button now records decline (no ambiguous dismiss)
 
 ---
 
@@ -211,10 +218,10 @@ Before storing conversation data in Google Sheets, the following sanitization is
 
 ### Server-Side Error Handling
 - All API endpoints wrapped in try-catch blocks
-- Generic error messages returned to client
+- Only known validation error messages surfaced to client; all other errors return generic message
 - Detailed errors logged server-side only
 - HTTP status codes used correctly (400, 429, 500)
-- **Location**: `app/api/chat/route.ts:92-100`, `app/api/submit/route.ts:121-129`
+- **Location**: `app/api/chat/route.ts`, `app/api/submit/route.ts`
 
 ---
 
@@ -272,20 +279,19 @@ Before storing conversation data in Google Sheets, the following sanitization is
 1. **Rate Limiting**: In-memory storage, resets on server restart
 2. **IP-Based**: Can be bypassed with VPN/proxies (acceptable for low-stakes app)
 3. **PII Detection**: Basic regex patterns, may miss complex PII
-4. **No Authentication**: Anyone can use the assessment tool
-5. **Prompt Injection**: Detection only, not blocking (to avoid false positives)
+4. **No Authentication**: Anyone can use the assessment tool (by design for self-service tool)
+5. **CSP**: Next.js 16 requires `unsafe-inline` and `unsafe-eval` for framework scripts
+6. **Webhook**: Google Sheets webhook has no HMAC signature verification
 
 ### Recommended Future Enhancements
-1. **Persistent Rate Limiting**: Use Redis or similar for cross-instance rate limiting
+1. **Persistent Rate Limiting**: Configure Vercel KV for cross-instance rate limiting
 2. **Advanced PII Detection**: Use ML-based entity recognition
 3. **CAPTCHA**: Add reCAPTCHA for submission to prevent bot abuse
 4. **Authentication**: Optional user accounts for tracking assessments
 5. **Audit Logging**: Log all submissions with metadata for security monitoring
-6. **Content Security Policy (CSP)**: Add CSP headers to prevent inline scripts
-7. **Webhook Security**: Implement HMAC signature verification for Google Sheets webhook
-8. **Data Retention Policy**: Automatic deletion of old conversation data
-9. **User Consent**: Add privacy policy and explicit consent before data collection
-10. **API Key Rotation**: Regular rotation schedule for Google AI API key
+6. **Webhook Security**: Implement HMAC signature verification for Google Sheets webhook
+7. **Data Retention Policy**: Automatic deletion of old conversation data
+8. **API Key Rotation**: Regular rotation schedule for Google AI API key
 
 ---
 
