@@ -71,7 +71,7 @@ Keep your responses natural and conversational, as if you're having a normal con
 
 ## Section 2: Domain Classification
 **Q3:** "Which of these best describes your area of work?"
-*Options:* Agriculture, DRRM, Environment, Health, Education, Transportation, Public Admin, Finance, Social Services, Science, Defense, Industry, Other.
+*Options:* Agriculture, Environment & Natural Resources, DRRM & Climate, Health, Education, Transportation & Infrastructure, Public Administration & Governance, Finance, Trade & Industry, Social Services & Labor, Science & Technology, Defense & Public Safety, Justice & Legal, Tourism, Energy, Other.
 
 ## Section 3: Pain Points
 **Q4:** "What tasks take up most of your team's time? What do you wish you could automate?"
