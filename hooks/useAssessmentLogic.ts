@@ -155,6 +155,9 @@ export function useAssessmentLogic(): [AssessmentState, AssessmentActions] {
    */
   const checkCompletion = useCallback(
     (messages: UIMessage[]) => {
+      // Early exit if already submitted — prevents race condition from rapid useEffect calls
+      if (hasSubmittedRef.current) return;
+
       const lastMessage = messages[messages.length - 1];
       if (lastMessage?.role === 'assistant') {
         // Get text parts
@@ -172,7 +175,10 @@ export function useAssessmentLogic(): [AssessmentState, AssessmentActions] {
           .map((p) => p.text)
           .join('');
 
-        if (isAssessmentComplete(content) && !hasSubmittedRef.current) {
+        if (isAssessmentComplete(content)) {
+          // Set ref immediately to block any concurrent calls
+          hasSubmittedRef.current = true;
+
           const cleanedContent = removeCompletionMarker(content);
           setState((prev) => ({
             ...prev,
@@ -180,8 +186,6 @@ export function useAssessmentLogic(): [AssessmentState, AssessmentActions] {
             report: cleanedContent,
           }));
 
-          // Submit to backend (only once)
-          hasSubmittedRef.current = true;
           submitAssessment(messages, cleanedContent);
         }
       }
