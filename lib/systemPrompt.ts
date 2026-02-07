@@ -145,8 +145,9 @@ At the end of the interview, output the assessment in this Markdown format:
 ---
 
 **Thank you for completing the assessment!** You can download this report using the button below.
+
+###ASSESSMENT_COMPLETE###
 \`\`\`
 
-IMPORTANT: After generating the final report, include this special marker at the very end of your response:
-###ASSESSMENT_COMPLETE###
+CRITICAL: You MUST include the ###ASSESSMENT_COMPLETE### marker EXACTLY as shown above, immediately after the "Thank you" message and BEFORE the closing code fence. This marker is essential for the system to detect completion. Do not modify, omit, or relocate this marker.
 `;

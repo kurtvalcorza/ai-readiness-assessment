@@ -252,12 +252,37 @@ export function parseAssessmentReport(report: string): ParsedReport {
 }
 
 /**
- * Checks if report contains completion marker
+ * Checks if report contains completion marker or completion indicators
  * @param content - The message content to check
  * @returns True if assessment is complete
  */
 export function isAssessmentComplete(content: string): boolean {
-  return content.includes(ASSESSMENT_COMPLETE_MARKER);
+  // Primary check: explicit marker
+  if (content.includes(ASSESSMENT_COMPLETE_MARKER)) {
+    return true;
+  }
+
+  // Fallback check: look for completion indicators in the content
+  const completionIndicators = [
+    'Thank you for completing the assessment',
+    'You can download this report',
+    'download your report',
+    'Assessment is complete',
+  ];
+
+  const hasCompletionIndicator = completionIndicators.some((indicator) =>
+    content.toLowerCase().includes(indicator.toLowerCase())
+  );
+
+  // Also check if the content has the expected report structure
+  const hasReportStructure =
+    content.includes('## AI Readiness Assessment') &&
+    content.includes('**Organization:**') &&
+    content.includes('**Domain:**') &&
+    content.includes('**Readiness Level:**');
+
+  // Consider complete if it has both completion indicator and report structure
+  return hasCompletionIndicator && hasReportStructure;
 }
 
 /**
