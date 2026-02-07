@@ -94,11 +94,17 @@ describe('ChatInput', () => {
     const user = userEvent.setup();
     render(<ChatInput onSubmit={mockOnSubmit} isLoading={false} />);
 
-    const input = screen.getByPlaceholderText('Type your answer...');
-    const longMessage = 'a'.repeat(2001);
+    const input = screen.getByPlaceholderText('Type your answer...') as HTMLTextAreaElement;
+    const form = input.closest('form')!;
     
-    await user.type(input, longMessage);
-    await user.click(screen.getByRole('button', { name: /send message/i }));
+    // Remove maxLength temporarily to test validation
+    input.removeAttribute('maxlength');
+    
+    const longMessage = 'a'.repeat(2001);
+    fireEvent.change(input, { target: { value: longMessage } });
+    
+    // Trigger form submission directly since button will be disabled
+    fireEvent.submit(form);
 
     await waitFor(() => {
       expect(screen.getByText(/Message is too long/)).toBeInTheDocument();
