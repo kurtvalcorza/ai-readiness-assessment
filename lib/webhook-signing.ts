@@ -2,13 +2,14 @@
  * HMAC-SHA256 webhook signing utility
  * Signs outbound webhook requests so the receiving Google Apps Script
  * can verify the request originated from this application.
+ *
+ * Note: Google Apps Script doPost() cannot access custom HTTP headers,
+ * so the signature and timestamp are embedded in the JSON body instead.
  */
 
 import { createHmac } from 'crypto';
 
-const SIGNATURE_HEADER = 'X-Webhook-Signature';
-const TIMESTAMP_HEADER = 'X-Webhook-Timestamp';
-const MAX_TIMESTAMP_DRIFT_MS = 300000; // 5 minutes
+export const MAX_TIMESTAMP_DRIFT_MS = 300000; // 5 minutes
 
 /**
  * Creates an HMAC-SHA256 signature for a webhook payload
@@ -24,20 +25,21 @@ export function createWebhookSignature(
 }
 
 /**
- * Returns signed headers to attach to an outbound webhook request
+ * Wraps a JSON payload with HMAC signature fields for webhook verification.
+ * Returns a new JSON string with _webhookSignature and _webhookTimestamp added.
  */
-export function getSignedWebhookHeaders(
-  body: string,
+export function signWebhookPayload(
+  data: Record<string, unknown>,
   secret: string
-): Record<string, string> {
+): string {
+  // Signature is computed over the original data (without signature fields)
+  const body = JSON.stringify(data);
   const timestamp = Date.now();
   const signature = createWebhookSignature(body, secret, timestamp);
 
-  return {
-    [SIGNATURE_HEADER]: signature,
-    [TIMESTAMP_HEADER]: String(timestamp),
-  };
+  return JSON.stringify({
+    ...data,
+    _webhookSignature: signature,
+    _webhookTimestamp: timestamp,
+  });
 }
-
-// Export header names for documentation / Apps Script reference
-export { SIGNATURE_HEADER, TIMESTAMP_HEADER, MAX_TIMESTAMP_DRIFT_MS };

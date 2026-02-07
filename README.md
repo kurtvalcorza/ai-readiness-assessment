@@ -79,30 +79,35 @@ const MAX_TIMESTAMP_DRIFT_MS = 300000; // 5 minutes
 
 function doPost(e) {
   try {
+    var fullData = JSON.parse(e.postData.contents);
     // Verify HMAC signature if configured
     if (SIGNING_SECRET && SIGNING_SECRET !== 'YOUR_SECRET_HERE') {
-      const signature = getHeaderValue(e, 'X-Webhook-Signature');
-      const timestamp = getHeaderValue(e, 'X-Webhook-Timestamp');
+      var signature = fullData._webhookSignature;
+      var timestamp = fullData._webhookTimestamp;
       if (!signature || !timestamp) {
         return ContentService.createTextOutput(JSON.stringify({ success: false, error: 'Missing signature' }))
           .setMimeType(ContentService.MimeType.JSON);
       }
-      const requestAge = Date.now() - Number(timestamp);
+      var requestAge = Date.now() - Number(timestamp);
       if (isNaN(requestAge) || Math.abs(requestAge) > MAX_TIMESTAMP_DRIFT_MS) {
         return ContentService.createTextOutput(JSON.stringify({ success: false, error: 'Request expired' }))
           .setMimeType(ContentService.MimeType.JSON);
       }
-      const expected = computeHmacSha256(timestamp + '.' + e.postData.contents, SIGNING_SECRET);
+      // Reconstruct original payload (without signature fields) for verification
+      var originalData = {};
+      for (var key in fullData) {
+        if (key !== '_webhookSignature' && key !== '_webhookTimestamp') originalData[key] = fullData[key];
+      }
+      var expected = computeHmacSha256(timestamp + '.' + JSON.stringify(originalData), SIGNING_SECRET);
       if (signature !== expected) {
         return ContentService.createTextOutput(JSON.stringify({ success: false, error: 'Invalid signature' }))
           .setMimeType(ContentService.MimeType.JSON);
       }
     }
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-    const data = JSON.parse(e.postData.contents);
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
     sheet.appendRow([
-      data.timestamp, data.organization, data.domain, data.readinessLevel,
-      data.primarySolution, data.secondarySolution, data.nextSteps, data.conversationHistory
+      fullData.timestamp, fullData.organization, fullData.domain, fullData.readinessLevel,
+      fullData.primarySolution, fullData.secondarySolution, fullData.nextSteps, fullData.conversationHistory
     ]);
     return ContentService.createTextOutput(JSON.stringify({ success: true }))
       .setMimeType(ContentService.MimeType.JSON);
@@ -110,12 +115,6 @@ function doPost(e) {
     return ContentService.createTextOutput(JSON.stringify({ success: false, error: error.toString() }))
       .setMimeType(ContentService.MimeType.JSON);
   }
-}
-
-function getHeaderValue(e, name) {
-  if (e.parameter && e.parameter[name]) return e.parameter[name];
-  if (e.headers && e.headers[name]) return e.headers[name];
-  return null;
 }
 
 function computeHmacSha256(message, secret) {

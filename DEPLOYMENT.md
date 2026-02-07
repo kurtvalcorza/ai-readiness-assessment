@@ -42,14 +42,12 @@ const MAX_TIMESTAMP_DRIFT_MS = 300000;
 
 function doPost(e) {
   try {
+    var fullData = JSON.parse(e.postData.contents);
+
     // Verify HMAC signature if signing secret is configured
     if (SIGNING_SECRET && SIGNING_SECRET !== 'YOUR_SECRET_HERE') {
-      const signature = e.parameter['X-Webhook-Signature']
-        || (e.postData && e.postData.headers && e.postData.headers['X-Webhook-Signature'])
-        || getHeaderValue(e, 'X-Webhook-Signature');
-      const timestamp = e.parameter['X-Webhook-Timestamp']
-        || (e.postData && e.postData.headers && e.postData.headers['X-Webhook-Timestamp'])
-        || getHeaderValue(e, 'X-Webhook-Timestamp');
+      var signature = fullData._webhookSignature;
+      var timestamp = fullData._webhookTimestamp;
 
       if (!signature || !timestamp) {
         return ContentService.createTextOutput(JSON.stringify({ success: false, error: 'Missing signature' }))
@@ -57,33 +55,39 @@ function doPost(e) {
       }
 
       // Reject stale requests
-      const requestAge = Date.now() - Number(timestamp);
-      if (isNaN(requestAge) || requestAge > MAX_TIMESTAMP_DRIFT_MS || requestAge < -MAX_TIMESTAMP_DRIFT_MS) {
+      var requestAge = Date.now() - Number(timestamp);
+      if (isNaN(requestAge) || Math.abs(requestAge) > MAX_TIMESTAMP_DRIFT_MS) {
         return ContentService.createTextOutput(JSON.stringify({ success: false, error: 'Request expired' }))
           .setMimeType(ContentService.MimeType.JSON);
       }
 
-      // Verify HMAC-SHA256 signature
-      const body = e.postData.contents;
-      const expectedSignature = computeHmacSha256(timestamp + '.' + body, SIGNING_SECRET);
+      // Reconstruct the original payload (without signature fields) for verification
+      var originalData = {};
+      for (var key in fullData) {
+        if (key !== '_webhookSignature' && key !== '_webhookTimestamp') {
+          originalData[key] = fullData[key];
+        }
+      }
+      var originalBody = JSON.stringify(originalData);
+      var expectedSignature = computeHmacSha256(timestamp + '.' + originalBody, SIGNING_SECRET);
+
       if (signature !== expectedSignature) {
         return ContentService.createTextOutput(JSON.stringify({ success: false, error: 'Invalid signature' }))
           .setMimeType(ContentService.MimeType.JSON);
       }
     }
 
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-    const data = JSON.parse(e.postData.contents);
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
 
     sheet.appendRow([
-      data.timestamp,
-      data.organization,
-      data.domain,
-      data.readinessLevel,
-      data.primarySolution,
-      data.secondarySolution,
-      data.nextSteps,
-      data.conversationHistory
+      fullData.timestamp,
+      fullData.organization,
+      fullData.domain,
+      fullData.readinessLevel,
+      fullData.primarySolution,
+      fullData.secondarySolution,
+      fullData.nextSteps,
+      fullData.conversationHistory
     ]);
 
     return ContentService.createTextOutput(JSON.stringify({ success: true }))
@@ -94,26 +98,16 @@ function doPost(e) {
   }
 }
 
-/** Helper: extract header from the request event */
-function getHeaderValue(e, headerName) {
-  try {
-    if (e.headers && e.headers[headerName]) return e.headers[headerName];
-    // Apps Script passes custom headers via the request parameter for web apps
-    if (e.parameter && e.parameter[headerName]) return e.parameter[headerName];
-  } catch (_) {}
-  return null;
-}
-
 /** Compute HMAC-SHA256 and return hex string */
 function computeHmacSha256(message, secret) {
-  const signature = Utilities.computeHmacSha256Signature(message, secret);
+  var signature = Utilities.computeHmacSha256Signature(message, secret);
   return signature.map(function(byte) {
     return ('0' + (byte & 0xFF).toString(16)).slice(-2);
   }).join('');
 }
 ```
 
-> **Note:** Replace `YOUR_SECRET_HERE` with the same value you set for `WEBHOOK_SIGNING_SECRET` in your Vercel environment variables. If you leave it as `YOUR_SECRET_HERE`, signature verification is skipped (backwards compatible).
+> **Note:** Replace `YOUR_SECRET_HERE` with the same value you set for `WEBHOOK_SIGNING_SECRET` in your Vercel/Amplify environment variables. If you leave it as `YOUR_SECRET_HERE`, signature verification is skipped (backwards compatible).
 
 3. Click **Deploy** → **New deployment**
 4. Choose type: **Web app**
