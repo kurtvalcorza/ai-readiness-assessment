@@ -171,9 +171,19 @@ export function AssessmentComplete({ report, onStartNew }: AssessmentCompletePro
             border-radius: 5px; 
             cursor: pointer; 
             margin: 20px 0; 
+            font-size: 16px;
         }
         .print-button:hover { background: #1e3a8a; }
+        .print-button:active { background: #172554; }
     </style>
+    <script>
+        // Auto-trigger print dialog when page loads
+        window.addEventListener('load', function() {
+            setTimeout(function() {
+                window.print();
+            }, 500);
+        });
+    </script>
 </head>
 <body>
     <div class="no-print">
@@ -196,11 +206,6 @@ export function AssessmentComplete({ report, onStartNew }: AssessmentCompletePro
       printWindow.document.write(htmlContent);
       printWindow.document.close();
       printWindow.focus();
-
-      // Auto-trigger print dialog after a short delay
-      setTimeout(() => {
-        printWindow.print();
-      }, 500);
 
     } catch (error) {
       console.error('Error generating PDF:', error);
