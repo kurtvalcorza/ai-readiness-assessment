@@ -6,7 +6,9 @@
 interface EnvConfig {
   GOOGLE_GENERATIVE_AI_API_KEY: string;
   GOOGLE_SHEETS_WEBHOOK_URL?: string;
+  WEBHOOK_SIGNING_SECRET?: string;
 }
+
 
 class EnvValidationError extends Error {
   constructor(message: string) {
@@ -49,9 +51,15 @@ export function validateEnv(): EnvConfig {
     console.warn('   Assessment responses will not be saved to Google Sheets');
   }
 
+  if (process.env.GOOGLE_SHEETS_WEBHOOK_URL && !process.env.WEBHOOK_SIGNING_SECRET) {
+    console.warn('⚠️  WEBHOOK_SIGNING_SECRET not set - webhook requests will not be signed');
+    console.warn('   Set this to enable HMAC verification on your Google Apps Script');
+  }
+
   return {
     GOOGLE_GENERATIVE_AI_API_KEY: process.env.GOOGLE_GENERATIVE_AI_API_KEY!,
     GOOGLE_SHEETS_WEBHOOK_URL: process.env.GOOGLE_SHEETS_WEBHOOK_URL,
+    WEBHOOK_SIGNING_SECRET: process.env.WEBHOOK_SIGNING_SECRET,
   };
 }
 
@@ -63,5 +71,6 @@ export function getEnv(): EnvConfig {
   return {
     GOOGLE_GENERATIVE_AI_API_KEY: process.env.GOOGLE_GENERATIVE_AI_API_KEY!,
     GOOGLE_SHEETS_WEBHOOK_URL: process.env.GOOGLE_SHEETS_WEBHOOK_URL,
+    WEBHOOK_SIGNING_SECRET: process.env.WEBHOOK_SIGNING_SECRET,
   };
 }

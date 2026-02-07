@@ -69,8 +69,35 @@ A self-service chatbot for assessing AI readiness of Philippine government agenc
 2. Go to **Extensions** → **Apps Script** and paste this code:
 
 ```javascript
+/**
+ * Shared secret for HMAC-SHA256 verification (must match WEBHOOK_SIGNING_SECRET).
+ * Generate with: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+ * Leave as 'YOUR_SECRET_HERE' to skip verification (not recommended for production).
+ */
+const SIGNING_SECRET = 'YOUR_SECRET_HERE';
+const MAX_TIMESTAMP_DRIFT_MS = 300000; // 5 minutes
+
 function doPost(e) {
   try {
+    // Verify HMAC signature if configured
+    if (SIGNING_SECRET && SIGNING_SECRET !== 'YOUR_SECRET_HERE') {
+      const signature = getHeaderValue(e, 'X-Webhook-Signature');
+      const timestamp = getHeaderValue(e, 'X-Webhook-Timestamp');
+      if (!signature || !timestamp) {
+        return ContentService.createTextOutput(JSON.stringify({ success: false, error: 'Missing signature' }))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
+      const requestAge = Date.now() - Number(timestamp);
+      if (isNaN(requestAge) || Math.abs(requestAge) > MAX_TIMESTAMP_DRIFT_MS) {
+        return ContentService.createTextOutput(JSON.stringify({ success: false, error: 'Request expired' }))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
+      const expected = computeHmacSha256(timestamp + '.' + e.postData.contents, SIGNING_SECRET);
+      if (signature !== expected) {
+        return ContentService.createTextOutput(JSON.stringify({ success: false, error: 'Invalid signature' }))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
+    }
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
     const data = JSON.parse(e.postData.contents);
     sheet.appendRow([
@@ -83,6 +110,17 @@ function doPost(e) {
     return ContentService.createTextOutput(JSON.stringify({ success: false, error: error.toString() }))
       .setMimeType(ContentService.MimeType.JSON);
   }
+}
+
+function getHeaderValue(e, name) {
+  if (e.parameter && e.parameter[name]) return e.parameter[name];
+  if (e.headers && e.headers[name]) return e.headers[name];
+  return null;
+}
+
+function computeHmacSha256(message, secret) {
+  return Utilities.computeHmacSha256Signature(message, secret)
+    .map(function(b) { return ('0' + (b & 0xFF).toString(16)).slice(-2); }).join('');
 }
 ```
 
@@ -120,7 +158,8 @@ ai-readiness-assessment/
 │   ├── systemPrompt.ts   # AI system prompt & assessment logic
 │   ├── types.ts          # TypeScript definitions
 │   ├── utils.ts          # Utility functions
-│   └── validation.ts     # Security and data validation
+│   ├── validation.ts     # Security and data validation
+│   └── webhook-signing.ts # HMAC-SHA256 webhook signing
 ├── tests/                # Comprehensive test suite
 ├── public/               # Static assets
 ├── .env.example          # Environment variables template

@@ -260,10 +260,14 @@ Before storing conversation data in Google Sheets, the following sanitization is
 
 ### Webhook Security Considerations
 - Webhook URL should be treated as sensitive
-- Consider using Google Apps Script authorization
+- HMAC-SHA256 signature verification available via `WEBHOOK_SIGNING_SECRET` env var
+- Signed message format: `${timestamp}.${body}` — prevents replay attacks (5-minute window)
+- Signature sent in `X-Webhook-Signature` header, timestamp in `X-Webhook-Timestamp`
+- Verification logic provided in Google Apps Script `doPost` (see README.md / DEPLOYMENT.md)
+- Backwards compatible: unsigned requests still work if secret is not configured
 - Optional feature (app works without it)
 - Sanitized data sent (no raw user input)
-- **Location**: `app/api/submit/route.ts:58-91`
+- **Location**: `app/api/submit/route.ts`, `lib/webhook-signing.ts`
 
 ### Data Privacy
 - Conversation history sanitized before storage
@@ -281,7 +285,7 @@ Before storing conversation data in Google Sheets, the following sanitization is
 3. **PII Detection**: Basic regex patterns, may miss complex PII
 4. **No Authentication**: Anyone can use the assessment tool (by design for self-service tool)
 5. **CSP**: Next.js 16 requires `unsafe-inline` and `unsafe-eval` for framework scripts
-6. **Webhook**: Google Sheets webhook has no HMAC signature verification
+6. **Webhook**: Google Sheets webhook HMAC signing is opt-in (requires `WEBHOOK_SIGNING_SECRET`)
 
 ### Recommended Future Enhancements
 1. **Persistent Rate Limiting**: Configure Vercel KV for cross-instance rate limiting
@@ -289,9 +293,8 @@ Before storing conversation data in Google Sheets, the following sanitization is
 3. **CAPTCHA**: Add reCAPTCHA for submission to prevent bot abuse
 4. **Authentication**: Optional user accounts for tracking assessments
 5. **Audit Logging**: Log all submissions with metadata for security monitoring
-6. **Webhook Security**: Implement HMAC signature verification for Google Sheets webhook
-7. **Data Retention Policy**: Automatic deletion of old conversation data
-8. **API Key Rotation**: Regular rotation schedule for Google AI API key
+6. **Data Retention Policy**: Automatic deletion of old conversation data
+7. **API Key Rotation**: Regular rotation schedule for Google AI API key
 
 ---
 
