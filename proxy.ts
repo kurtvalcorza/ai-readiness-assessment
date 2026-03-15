@@ -1,5 +1,5 @@
 /**
- * Next.js middleware for security headers
+ * Next.js proxy for security headers
  * 
  * Note: This app is designed to be embedded as an iframe in the ACABAI-PH website,
  * so frame-ancestors CSP directive allows embedding from trusted domains.
@@ -22,7 +22,7 @@ function generateNonce(): string {
   return btoa(String.fromCharCode(...array));
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const isDev = process.env.NODE_ENV === 'development';
   const nonce = generateNonce();
 

@@ -16,7 +16,7 @@ The application implements multiple layers of security controls at both the fron
 - ✅ Sanitized API error responses (no internal details leaked to clients)
 - ✅ Removed unused html2pdf.js dependency (eliminated jspdf CVEs + html2pdf.js XSS)
 - ✅ Removed CSP report GET handler (information disclosure)
-- ✅ Added X-Frame-Options header in middleware
+- ✅ Added X-Frame-Options header in proxy
 - ✅ Expanded Permissions-Policy (payment, usb, bluetooth, serial)
 - ✅ Removed deprecated block-all-mixed-content CSP directive
 - ✅ Consent banner close button now records decline (no ambiguous dismiss)
@@ -73,7 +73,7 @@ block-all-mixed-content;
 report-uri /api/csp-report;
 ```
 
-**Note**: Next.js 16 requires both `'unsafe-inline'` and `'unsafe-eval'` for framework scripts when using middleware-based CSP. This is a known limitation of the middleware approach in Next.js 16.
+**Note**: Next.js 16 requires both `'unsafe-inline'` and `'unsafe-eval'` for framework scripts when using proxy-based CSP. This is a known limitation of the proxy approach in Next.js 16.
 
 ### Nonce-Based Script Execution
 - Unique cryptographic nonce generated per request

@@ -7,8 +7,6 @@
 
 import { NextRequest } from 'next/server';
 
-export const runtime = 'edge';
-
 /** Simple in-memory rate limiter for CSP reports (Edge-compatible) */
 const reportCounts = new Map<string, { count: number; resetTime: number }>();
 const CSP_RATE_LIMIT = 100; // max reports per window

@@ -111,7 +111,7 @@ The refactoring was done incrementally without breaking changes:
 │  ┌──────────────────────────────────────────────────────┐  │
 │  │              API Routes                               │  │
 │  │  ┌────────────┐  ┌────────────┐  ┌────────────┐    │  │
-│  │  │ /api/chat  │  │/api/submit │  │ Middleware │    │  │
+│  │  │ /api/chat  │  │/api/submit │  │   Proxy   │    │  │
 │  │  └────────────┘  └────────────┘  └────────────┘    │  │
 │  └──────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
@@ -213,7 +213,7 @@ ai-readiness-assessment/
 │   └── api/                      # API route tests
 │
 ├── public/                       # Static assets
-├── middleware.ts                 # Security headers & CSP
+├── proxy.ts                     # Security headers & CSP
 ├── .env.example                  # Environment variables template
 ├── ARCHITECTURE.md               # This file
 ├── README.md                     # Project documentation

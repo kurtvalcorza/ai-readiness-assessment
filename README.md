@@ -258,7 +258,7 @@ npm run test:coverage # Coverage report
 - `lib/schemas.ts` - Zod schemas for runtime validation
 - `lib/constants/` - Organized constants by domain (security, validation, parsing)
 - `tests/` - Comprehensive test suite with >80% coverage
-- `middleware.ts` - Security headers and Content Security Policy
+- `proxy.ts` - Security headers and Content Security Policy
 
 For detailed architecture information, see [ARCHITECTURE.md](./ARCHITECTURE.md)
 
