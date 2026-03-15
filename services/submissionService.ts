@@ -5,6 +5,7 @@
 
 import { signWebhookPayload } from '@/lib/webhook-signing';
 import { AssessmentData, GoogleSheetsData } from '@/lib/types';
+import { safeLogError } from '@/lib/safe-logger';
 
 export interface SubmissionConfig {
   webhookUrl?: string;
@@ -113,7 +114,7 @@ export async function submitAssessment(
       message: 'Assessment submitted successfully',
     };
   } catch (error: any) {
-    console.error('[submitAssessment] Error:', error.message);
+    safeLogError('[submitAssessment] Error', error);
     return {
       success: false,
       message: 'Submission failed. Please try again.',

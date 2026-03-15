@@ -11,6 +11,7 @@ import { checkChatRateLimit } from '@/lib/rate-limit';
 import { createErrorResponse } from '@/lib/api-utils';
 import { validateConversation, prepareMessagesForAI } from '@/services/chatService';
 import { IncomingMessage } from '@/lib/types';
+import { safeLogError } from '@/lib/safe-logger';
 
 export const maxDuration = 30;
 
@@ -64,7 +65,7 @@ export async function POST(req: Request) {
     
     return response;
   } catch (error: any) {
-    console.error('Chat API error:', error);
+    safeLogError('Chat API error', error);
 
     // Determine safe client-facing message based on known validation errors
     const safeMessages = [
