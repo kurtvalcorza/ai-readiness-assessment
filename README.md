@@ -9,7 +9,7 @@ A self-service chatbot for assessing AI readiness of Philippine government agenc
 - **Automatic Report Generation**: Creates customized assessment reports with readiness levels
 - **Multiple Download Formats**: Markdown and HTML reports with print-to-PDF capability
 - **Session Management**: Conversations automatically end after report generation
-- **Data Collection**: Automatically saves responses to Google Sheets with full solution details
+- **Data Collection**: Automatically saves responses to Neon PostgreSQL with full solution details (Google Sheets available as fallback)
 - **Security Guardrails**: Comprehensive input validation, rate limiting, and PII redaction
 - **Error Handling**: React error boundaries with graceful fallback UI
 - **Responsive Design**: Works seamlessly on desktop and mobile devices
@@ -26,7 +26,7 @@ A self-service chatbot for assessing AI readiness of Philippine government agenc
 - **Validation**: Zod for runtime type validation
 - **Security**: Content Security Policy, rate limiting, input validation
 - **Deployment**: Vercel with optional Vercel KV for distributed rate limiting
-- **Data Storage**: Google Sheets via Apps Script webhook
+- **Data Storage**: Neon (serverless PostgreSQL) — with Google Sheets available as a fallback via env var toggle
 - **Architecture**: Custom hooks, service layer, utility functions
 
 ## Quick Start
@@ -46,6 +46,12 @@ A self-service chatbot for assessing AI readiness of Philippine government agenc
 4. Create `.env.local` file:
    ```
    GOOGLE_GENERATIVE_AI_API_KEY=your_api_key_here
+
+   # Neon PostgreSQL (primary storage)
+   DATABASE_URL=postgresql://user:pass@ep-xxx.us-east-1.aws.neon.tech/neondb?sslmode=require
+   STORAGE_PROVIDER=neon
+
+   # Google Sheets (optional fallback — set STORAGE_PROVIDER=google_sheets to use)
    GOOGLE_SHEETS_WEBHOOK_URL=your_webhook_url_here
    ```
 
@@ -56,7 +62,20 @@ A self-service chatbot for assessing AI readiness of Philippine government agenc
 
 6. Open http://localhost:3000
 
-### Google Sheets Setup (Optional - for collecting responses)
+### Neon PostgreSQL Setup (Primary storage)
+
+1. Create a free project at [neon.tech](https://neon.tech)
+   - Recommended: **AWS** cloud provider, same region as your Vercel deployment (default: US East)
+
+2. In the Neon SQL Editor, run the contents of `schema.sql` to create the `assessments` table
+
+3. Copy the connection string from the Neon dashboard and add to `.env.local` as `DATABASE_URL`
+
+4. Set `STORAGE_PROVIDER=neon` (or omit — it defaults to `neon`)
+
+The `assessments` table stores: `timestamp`, `organization`, `domain`, `readiness_level`, `primary_solution`, `secondary_solution`, `next_steps`, `conversation_history`.
+
+### Google Sheets Setup (Optional fallback)
 
 1. Create a Google Sheet with these headers in Row 1:
    - **Column A**: Timestamp
@@ -72,6 +91,16 @@ A self-service chatbot for assessing AI readiness of Philippine government agenc
 
 3. Deploy as **Web app** (Execute as: Me, Access: Anyone)
 4. Copy the Web App URL and add to `.env.local` as `GOOGLE_SHEETS_WEBHOOK_URL`
+5. Set `STORAGE_PROVIDER=google_sheets` in your environment variables
+
+### Switching storage backends
+
+No code changes needed — just update `STORAGE_PROVIDER` in Vercel and redeploy:
+
+| Value | Backend |
+|-------|---------|
+| `neon` (default) | Neon PostgreSQL |
+| `google_sheets` | Google Sheets webhook |
 
 ### Deployment
 
@@ -119,8 +148,9 @@ ai-readiness-assessment/
 │   ├── useChatScroll.ts       # Auto-scroll behavior
 │   └── useConsent.ts          # Consent banner management
 ├── services/
-│   ├── chatService.ts         # Chat validation & message prep
-│   └── submissionService.ts   # Assessment submission logic
+│   ├── chatService.ts             # Chat validation & message prep
+│   ├── submissionService.ts       # Google Sheets submission logic (fallback)
+│   └── neonSubmissionService.ts   # Neon PostgreSQL submission logic (primary)
 ├── lib/
 │   ├── api-utils.ts       # Response formatting utilities
 │   ├── constants/
@@ -142,6 +172,7 @@ ai-readiness-assessment/
 │   ├── services/         # Service layer tests
 │   └── api/              # API route tests
 ├── public/               # Static assets
+├── schema.sql            # Neon PostgreSQL table definition (run once in Neon console)
 ├── .env.example          # Environment variables template
 ├── ARCHITECTURE.md       # Detailed architecture documentation
 ├── DEPLOYMENT.md         # Deployment guide
@@ -161,7 +192,7 @@ ai-readiness-assessment/
    - Readiness Signals
    - Interest & Constraints
 3. **AI generates report** - Customized assessment with readiness level and recommendations
-4. **Data saved** - Response automatically sent to Google Sheets with full details:
+4. **Data saved** - Response automatically saved to Neon PostgreSQL (or Google Sheets if configured) with:
    - Organization, Domain, Readiness Level
    - Primary and Secondary AI solutions
    - Next steps for implementation
@@ -196,10 +227,17 @@ For detailed security information, see [SECURITY.md](./SECURITY.md)
 **Required:**
 - `GOOGLE_GENERATIVE_AI_API_KEY` - Google AI API key
 
-**Optional (for enhanced features):**
-- `GOOGLE_SHEETS_WEBHOOK_URL` - Google Apps Script webhook URL (for data collection)
-- `KV_REST_API_URL` - Vercel KV URL (for distributed rate limiting in production)
-- `KV_REST_API_TOKEN` - Vercel KV token (for distributed rate limiting in production)
+**Storage (Neon — primary):**
+- `DATABASE_URL` - Neon PostgreSQL connection string
+- `STORAGE_PROVIDER` - Set to `neon` (default) or `google_sheets` to toggle storage backend
+
+**Storage (Google Sheets — fallback):**
+- `GOOGLE_SHEETS_WEBHOOK_URL` - Google Apps Script webhook URL
+- `WEBHOOK_SIGNING_SECRET` - Optional secret for signing webhook payloads
+
+**Rate limiting (production):**
+- `KV_REST_API_URL` - Vercel KV URL (for distributed rate limiting)
+- `KV_REST_API_TOKEN` - Vercel KV token (for distributed rate limiting)
 
 **Development vs Production:**
 - Development: Uses in-memory rate limiting
