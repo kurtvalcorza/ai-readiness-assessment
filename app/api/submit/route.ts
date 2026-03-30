@@ -7,9 +7,15 @@ import { checkSubmissionRateLimit } from '@/lib/rate-limit';
 import { validateAssessmentData } from '@/lib/validation';
 import { createJsonResponse, createErrorResponse } from '@/lib/api-utils';
 import { submitAssessment } from '@/services/submissionService';
+import { submitToNeon } from '@/services/neonSubmissionService';
 import { MAX_ORGANIZATION_LENGTH, MAX_DOMAIN_LENGTH } from '@/lib/constants';
 import { AssessmentData } from '@/lib/types';
 import { safeLogOrganization, safeLogSubmissionResult, safeLogError } from '@/lib/safe-logger';
+
+// Toggle storage backend via STORAGE_PROVIDER env var.
+// Set to 'google_sheets' to revert to the original Google Sheets webhook.
+// Defaults to 'neon' (Neon PostgreSQL).
+const STORAGE_PROVIDER = process.env.STORAGE_PROVIDER ?? 'neon';
 
 export const maxDuration = 30;
 
@@ -56,12 +62,17 @@ export async function POST(req: Request): Promise<Response> {
       return createErrorResponse('Field values exceed maximum length', 400);
     }
 
-    // Submit to Google Sheets
-    console.log('[submit] Submitting to Google Sheets...');
-    const result = await submitAssessment(data, {
-      webhookUrl: process.env.GOOGLE_SHEETS_WEBHOOK_URL,
-      signingSecret: process.env.WEBHOOK_SIGNING_SECRET,
-    });
+    // Submit to the configured storage provider
+    console.log(`[submit] Submitting via STORAGE_PROVIDER=${STORAGE_PROVIDER}...`);
+    let result;
+    if (STORAGE_PROVIDER === 'google_sheets') {
+      result = await submitAssessment(data, {
+        webhookUrl: process.env.GOOGLE_SHEETS_WEBHOOK_URL,
+        signingSecret: process.env.WEBHOOK_SIGNING_SECRET,
+      });
+    } else {
+      result = await submitToNeon(data);
+    }
     console.log('[submit] Submission result:', safeLogSubmissionResult(result));
 
     if (!result.success) {
