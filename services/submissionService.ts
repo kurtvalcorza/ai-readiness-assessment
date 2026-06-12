@@ -5,6 +5,7 @@
 
 import { signWebhookPayload } from '@/lib/webhook-signing';
 import { AssessmentData, GoogleSheetsData } from '@/lib/types';
+import { buildSubmissionRecord } from './submissionRecord';
 import { safeLogError } from '@/lib/safe-logger';
 
 export interface SubmissionConfig {
@@ -24,16 +25,7 @@ export interface SubmissionResult {
  * @returns Formatted data ready for Google Sheets
  */
 export function formatForGoogleSheets(data: AssessmentData): GoogleSheetsData {
-  return {
-    timestamp: data.timestamp,
-    organization: data.organization,
-    domain: data.domain,
-    readinessLevel: data.readinessLevel,
-    primarySolution: data.solutions[0]?.category || '',
-    secondarySolution: data.solutions[1]?.category || '',
-    nextSteps: data.nextSteps.join('; '),
-    conversationHistory: data.conversationHistory || '',
-  };
+  return buildSubmissionRecord(data);
 }
 
 /**

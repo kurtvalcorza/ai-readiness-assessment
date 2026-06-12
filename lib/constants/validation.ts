@@ -36,6 +36,19 @@ export const VALIDATION = {
   },
 
   /**
+   * Assessment submission payload limits
+   * Server-side bounds so a direct API call cannot store unbounded data
+   */
+  ASSESSMENT: {
+    MAX_READINESS_LEVEL_LENGTH: 100, // Max length for readiness level field
+    MAX_SOLUTIONS: 10, // Max solutions per submission
+    MAX_SOLUTION_FIELD_LENGTH: 2000, // Max length per solution field (rationale is the longest)
+    MAX_NEXT_STEPS: 20, // Max next-step items per submission
+    MAX_NEXT_STEP_LENGTH: 1000, // Max length per next-step item
+    MAX_HISTORY_PAYLOAD_SIZE: 100000, // Hard request cap; stored history is further truncated to CONVERSATION.MAX_HISTORY_SIZE
+  },
+
+  /**
    * PII detection patterns
    * Used for sanitizing sensitive information
    */
@@ -79,5 +92,11 @@ export const MAX_MESSAGES_COUNT = VALIDATION.CONVERSATION.MAX_MESSAGES;
 export const MAX_CONVERSATION_HISTORY_SIZE = VALIDATION.CONVERSATION.MAX_HISTORY_SIZE;
 export const MAX_ORGANIZATION_LENGTH = VALIDATION.ORGANIZATION.MAX_LENGTH;
 export const MAX_DOMAIN_LENGTH = VALIDATION.DOMAIN.MAX_LENGTH;
+export const MAX_READINESS_LEVEL_LENGTH = VALIDATION.ASSESSMENT.MAX_READINESS_LEVEL_LENGTH;
+export const MAX_SOLUTIONS = VALIDATION.ASSESSMENT.MAX_SOLUTIONS;
+export const MAX_SOLUTION_FIELD_LENGTH = VALIDATION.ASSESSMENT.MAX_SOLUTION_FIELD_LENGTH;
+export const MAX_NEXT_STEPS = VALIDATION.ASSESSMENT.MAX_NEXT_STEPS;
+export const MAX_NEXT_STEP_LENGTH = VALIDATION.ASSESSMENT.MAX_NEXT_STEP_LENGTH;
+export const MAX_HISTORY_PAYLOAD_SIZE = VALIDATION.ASSESSMENT.MAX_HISTORY_PAYLOAD_SIZE;
 export const PII_PATTERNS = VALIDATION.PII_PATTERNS;
 export const REDACTION_PLACEHOLDERS = VALIDATION.REDACTION;

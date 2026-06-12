@@ -24,8 +24,9 @@ vi.mock('@/lib/env', () => ({
   validateEnv: vi.fn(),
 }));
 
-// Mock validation functions
-vi.mock('@/lib/validation', () => ({
+// Mock validation functions (keep the real sanitization helpers used by the record builder)
+vi.mock('@/lib/validation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/validation')>()),
   validateMessageContent: vi.fn(),
   detectPromptInjection: vi.fn(() => []),
   validateAssessmentData: vi.fn(),
@@ -52,6 +53,9 @@ describe('API Routes Integration', () => {
     (validateAssessmentData as any).mockReturnValue(undefined);
     mockFetch.mockResolvedValue({
       ok: true,
+      status: 200,
+      redirected: false,
+      text: () => Promise.resolve(JSON.stringify({ success: true })),
       json: () => Promise.resolve({ success: true }),
     });
   });
@@ -59,6 +63,8 @@ describe('API Routes Integration', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     delete process.env.GOOGLE_SHEETS_WEBHOOK_URL;
+    delete process.env.DATABASE_URL;
+    delete process.env.STORAGE_PROVIDER;
   });
 
   describe('Chat API', () => {
