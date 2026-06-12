@@ -2,6 +2,8 @@
 
 A self-service chatbot for assessing AI readiness of Philippine government agencies and NGOs.
 
+**Live**: [acabai-ph.vercel.app](https://acabai-ph.vercel.app) (production site embedding this app)
+
 ## Features
 
 - **Interactive Assessment**: 12-question guided interview across 6 key areas
@@ -10,7 +12,7 @@ A self-service chatbot for assessing AI readiness of Philippine government agenc
 - **Multiple Download Formats**: Markdown and HTML reports with print-to-PDF capability
 - **Session Management**: Conversations automatically end after report generation
 - **Data Collection**: Automatically saves responses to Neon PostgreSQL with full solution details (Google Sheets available as fallback)
-- **Security Guardrails**: Comprehensive input validation, rate limiting, and PII redaction
+- **Security Guardrails**: Comprehensive input validation, rate limiting, and PII redaction (enforced client- and server-side)
 - **Error Handling**: React error boundaries with graceful fallback UI
 - **Responsive Design**: Works seamlessly on desktop and mobile devices
 - **Accessibility**: WCAG 2.1 compliant with full keyboard navigation
@@ -18,7 +20,7 @@ A self-service chatbot for assessing AI readiness of Philippine government agenc
 
 ## Tech Stack
 
-- **Frontend**: Next.js 15+ with App Router, React 19, TypeScript
+- **Frontend**: Next.js 16 with App Router, React 19, TypeScript
 - **Styling**: Tailwind CSS with responsive design
 - **AI**: Google Generative AI (Gemini 2.5 Flash) with streaming responses
 - **UI Components**: Lucide React icons, ReactMarkdown, custom components
@@ -48,7 +50,7 @@ A self-service chatbot for assessing AI readiness of Philippine government agenc
    GOOGLE_GENERATIVE_AI_API_KEY=your_api_key_here
 
    # Neon PostgreSQL (primary storage)
-   DATABASE_URL=postgresql://user:pass@ep-xxx.us-east-1.aws.neon.tech/neondb?sslmode=require
+   DATABASE_URL=postgresql://user:pass@ep-xxx.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
    STORAGE_PROVIDER=neon
 
    # Google Sheets (optional fallback — set STORAGE_PROVIDER=google_sheets to use)
@@ -132,7 +134,7 @@ ai-readiness-assessment/
 ├── app/
 │   ├── api/
 │   │   ├── chat/          # Chat API endpoint with AI streaming
-│   │   ├── submit/        # Submission API for Google Sheets
+│   │   ├── submit/        # Submission API (Neon PostgreSQL or Google Sheets)
 │   │   └── csp-report/    # CSP violation reporting
 │   ├── layout.tsx         # Root layout with error boundaries
 │   ├── page.tsx           # Main chat interface (<200 lines)
@@ -152,6 +154,7 @@ ai-readiness-assessment/
 │   └── useConsent.ts          # Consent banner management
 ├── services/
 │   ├── chatService.ts             # Chat validation & message prep
+│   ├── submissionRecord.ts        # Shared AssessmentData→record mapping (both backends)
 │   ├── submissionService.ts       # Google Sheets submission logic (fallback)
 │   └── neonSubmissionService.ts   # Neon PostgreSQL submission logic (primary)
 ├── lib/
@@ -164,6 +167,7 @@ ai-readiness-assessment/
 │   ├── rate-limit.ts     # Rate limiting (Vercel KV + in-memory)
 │   ├── report-parser.ts  # Assessment report parsing
 │   ├── schemas.ts        # Zod schemas for validation
+│   ├── storage-provider.ts # Storage backend selection (explicit or auto-detect)
 │   ├── systemPrompt.ts   # AI system prompt & assessment logic
 │   ├── types.ts          # TypeScript definitions
 │   ├── utils.ts          # Utility functions
@@ -218,10 +222,12 @@ This application implements multiple layers of security to protect against abuse
 - **Rate Limiting**:
   - 30 requests per minute for chat API
   - 5 submissions per 5 minutes for data submission
-- **PII Redaction**: Automatic redaction of emails and phone numbers from stored data
+- **PII Redaction**: Automatic redaction of emails and phone numbers, applied client-side and re-applied server-side before storage
+- **Payload Bounds**: Zod limits on every submission field (solutions, next steps, conversation history) so direct API calls can't store unbounded data
 - **Session Control**: Input disabled after assessment completion
 - **Prompt Injection Detection**: Monitors for suspicious patterns
-- **Data Sanitization**: Conversation history sanitized before storage
+- **Data Sanitization**: Conversation history sanitized and size-capped before storage
+- **Fail-Loud Storage**: Misconfigured storage returns an error instead of silently discarding submissions; database inserts carry a 10s timeout
 
 For detailed security information, see [SECURITY.md](./SECURITY.md)
 
@@ -294,7 +300,9 @@ npm run test:coverage # Coverage report
 - `app/page.tsx` - Main chat interface (<200 lines, uses custom hooks)
 - `hooks/useAssessmentLogic.ts` - Assessment state management and completion detection
 - `services/chatService.ts` - Chat validation and message preparation
-- `services/submissionService.ts` - Assessment submission and formatting
+- `services/submissionRecord.ts` - Shared record builder used by both storage backends
+- `services/submissionService.ts` / `services/neonSubmissionService.ts` - Storage backend implementations
+- `lib/storage-provider.ts` - Backend selection (explicit `STORAGE_PROVIDER` or auto-detect)
 - `lib/api-utils.ts` - Consistent response formatting for API routes
 - `lib/schemas.ts` - Zod schemas for runtime validation
 - `lib/constants/` - Organized constants by domain (security, validation, parsing)
@@ -312,7 +320,7 @@ For detailed architecture information, see [ARCHITECTURE.md](./ARCHITECTURE.md)
 
 ## License
 
-MIT License
+MIT — built with AI
 
 ## Support
 
