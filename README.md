@@ -65,13 +65,13 @@ A self-service chatbot for assessing AI readiness of Philippine government agenc
 ### Neon PostgreSQL Setup (Primary storage)
 
 1. Create a free project at [neon.tech](https://neon.tech)
-   - Recommended: **AWS** cloud provider, same region as your Vercel deployment (default: US East)
+   - Recommended: **AWS** cloud provider, same region as your Vercel functions — this repo pins `sin1` (Singapore) in `vercel.json`, so choose **Asia Pacific (Singapore) `ap-southeast-1`**
 
 2. In the Neon SQL Editor, run the contents of `schema.sql` to create the `assessments` table
 
 3. Copy the connection string from the Neon dashboard and add to `.env.local` as `DATABASE_URL`
 
-4. Set `STORAGE_PROVIDER=neon` (or omit — it defaults to `neon`)
+4. Set `STORAGE_PROVIDER=neon` (or omit — when unset, the app auto-detects: Neon if `DATABASE_URL` is set, otherwise Google Sheets)
 
 The `assessments` table stores: `timestamp`, `organization`, `domain`, `readiness_level`, `primary_solution`, `secondary_solution`, `next_steps`, `conversation_history`.
 
@@ -99,8 +99,11 @@ No code changes needed — just update `STORAGE_PROVIDER` in Vercel and redeploy
 
 | Value | Backend |
 |-------|---------|
-| `neon` (default) | Neon PostgreSQL |
+| `neon` | Neon PostgreSQL |
 | `google_sheets` | Google Sheets webhook |
+| (unset) | Auto-detect: Neon if `DATABASE_URL` is set, else Google Sheets |
+
+Note: this is a static toggle, not automatic failover — if the active backend fails at runtime, the submission returns an error rather than falling back to the other backend.
 
 ### Deployment
 
@@ -229,7 +232,7 @@ For detailed security information, see [SECURITY.md](./SECURITY.md)
 
 **Storage (Neon — primary):**
 - `DATABASE_URL` - Neon PostgreSQL connection string
-- `STORAGE_PROVIDER` - Set to `neon` (default) or `google_sheets` to toggle storage backend
+- `STORAGE_PROVIDER` - Set to `neon` or `google_sheets` to toggle the storage backend (unset = auto-detect from configured credentials)
 
 **Storage (Google Sheets — fallback):**
 - `GOOGLE_SHEETS_WEBHOOK_URL` - Google Apps Script webhook URL

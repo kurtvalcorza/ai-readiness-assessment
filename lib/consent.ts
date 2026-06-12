@@ -4,7 +4,9 @@
  */
 
 const CONSENT_KEY = 'ai-assessment-consent';
-const CONSENT_VERSION = '1.0';
+// Bumped to 1.1 when assessment storage moved from the Google Sheets webhook
+// to Neon PostgreSQL, so returning users are re-prompted under the new terms.
+const CONSENT_VERSION = '1.1';
 
 export interface ConsentData {
   accepted: boolean;

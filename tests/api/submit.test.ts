@@ -6,13 +6,20 @@ vi.mock('@/lib/rate-limit', () => ({
   checkSubmissionRateLimit: vi.fn(),
 }));
 
-// Mock validation
-vi.mock('@/lib/validation', () => ({
+// Mock validation (keep the real sanitization helpers used by the record builder)
+vi.mock('@/lib/validation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/validation')>()),
   validateAssessmentData: vi.fn(),
+}));
+
+// Mock the Neon service so dispatch tests don't need a database
+vi.mock('@/services/neonSubmissionService', () => ({
+  submitToNeon: vi.fn(),
 }));
 
 import { checkSubmissionRateLimit } from '@/lib/rate-limit';
 import { validateAssessmentData } from '@/lib/validation';
+import { submitToNeon } from '@/services/neonSubmissionService';
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -42,8 +49,15 @@ describe('/api/submit', () => {
     // Default mocks
     (checkSubmissionRateLimit as any).mockResolvedValue({ allowed: true, remaining: 4 });
     (validateAssessmentData as any).mockReturnValue(undefined);
+    vi.mocked(submitToNeon).mockResolvedValue({
+      success: true,
+      message: 'Assessment submitted successfully',
+    });
     mockFetch.mockResolvedValue({
       ok: true,
+      status: 200,
+      redirected: false,
+      text: () => Promise.resolve(JSON.stringify({ success: true })),
       json: () => Promise.resolve({ success: true }),
     });
   });
@@ -51,6 +65,8 @@ describe('/api/submit', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     delete process.env.GOOGLE_SHEETS_WEBHOOK_URL;
+    delete process.env.DATABASE_URL;
+    delete process.env.STORAGE_PROVIDER;
   });
 
   it('returns 429 when rate limited', async () => {
@@ -208,6 +224,80 @@ describe('/api/submit', () => {
     const response = await POST(request);
     expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff');
     expect(response.headers.get('X-Frame-Options')).toBe('DENY');
+  });
+
+  it('routes to Neon when DATABASE_URL is configured', async () => {
+    process.env.DATABASE_URL = 'postgresql://user:pass@host/db';
+
+    const request = new Request('http://localhost/api/submit', {
+      method: 'POST',
+      body: JSON.stringify(validAssessmentData),
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(200);
+
+    const data = await response.json();
+    expect(data.success).toBe(true);
+    expect(data.message).toBe('Assessment submitted successfully');
+    expect(submitToNeon).toHaveBeenCalled();
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('honors explicit STORAGE_PROVIDER=google_sheets over a configured DATABASE_URL', async () => {
+    process.env.DATABASE_URL = 'postgresql://user:pass@host/db';
+    process.env.STORAGE_PROVIDER = 'google_sheets';
+    process.env.GOOGLE_SHEETS_WEBHOOK_URL = 'https://script.google.com/test';
+
+    const request = new Request('http://localhost/api/submit', {
+      method: 'POST',
+      body: JSON.stringify(validAssessmentData),
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(200);
+    expect(submitToNeon).not.toHaveBeenCalled();
+    expect(mockFetch).toHaveBeenCalled();
+  });
+
+  it('falls back to auto-detection for unknown STORAGE_PROVIDER values', async () => {
+    process.env.STORAGE_PROVIDER = 'google-sheets'; // typo: not a valid value
+    process.env.GOOGLE_SHEETS_WEBHOOK_URL = 'https://script.google.com/test';
+
+    const request = new Request('http://localhost/api/submit', {
+      method: 'POST',
+      body: JSON.stringify(validAssessmentData),
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(200);
+    expect(submitToNeon).not.toHaveBeenCalled();
+    expect(mockFetch).toHaveBeenCalled();
+  });
+
+  it('returns 500 when the Neon submission fails', async () => {
+    process.env.DATABASE_URL = 'postgresql://user:pass@host/db';
+    vi.mocked(submitToNeon).mockResolvedValue({
+      success: false,
+      message: 'Submission failed. Please try again.',
+      error: 'relation "assessments" does not exist',
+    });
+
+    const request = new Request('http://localhost/api/submit', {
+      method: 'POST',
+      body: JSON.stringify(validAssessmentData),
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(500);
+
+    const data = await response.json();
+    // Should NOT leak database details
+    expect(data.error).toBe('Submission failed. Please try again.');
   });
 
   it('does not leak network errors to client', async () => {

@@ -12,7 +12,12 @@
 import { neon } from '@neondatabase/serverless';
 import { AssessmentData } from '@/lib/types';
 import { SubmissionResult } from './submissionService';
+import { buildSubmissionRecord } from './submissionRecord';
 import { safeLogError } from '@/lib/safe-logger';
+
+// Abort a hung Neon HTTP call well before the route's 30s maxDuration,
+// so the client still receives the JSON error body instead of a platform timeout.
+const QUERY_TIMEOUT_MS = 10_000;
 
 /**
  * Submits assessment data to Neon PostgreSQL.
@@ -24,15 +29,25 @@ import { safeLogError } from '@/lib/safe-logger';
  */
 export async function submitToNeon(data: AssessmentData): Promise<SubmissionResult> {
   if (!process.env.DATABASE_URL) {
-    console.warn('[neonSubmission] DATABASE_URL is not configured');
+    // Fail loudly: this service is only selected when Neon is configured or
+    // explicitly requested, so a missing DATABASE_URL is a deployment error,
+    // not a benign "storage disabled" state.
+    console.error('[neonSubmission] DATABASE_URL is not configured - assessment cannot be stored');
     return {
-      success: true,
-      message: 'Data received (database not configured)',
+      success: false,
+      message: 'Submission failed. Please try again.',
+      error: 'DATABASE_URL is not configured',
     };
   }
 
+  const abortController = new AbortController();
+  const timeout = setTimeout(() => abortController.abort('Neon query timed out'), QUERY_TIMEOUT_MS);
+
   try {
-    const sql = neon(process.env.DATABASE_URL);
+    const sql = neon(process.env.DATABASE_URL, {
+      fetchOptions: { signal: abortController.signal },
+    });
+    const record = buildSubmissionRecord(data);
 
     await sql`
       INSERT INTO assessments (
@@ -45,14 +60,14 @@ export async function submitToNeon(data: AssessmentData): Promise<SubmissionResu
         next_steps,
         conversation_history
       ) VALUES (
-        ${data.timestamp},
-        ${data.organization},
-        ${data.domain},
-        ${data.readinessLevel},
-        ${data.solutions[0]?.category ?? ''},
-        ${data.solutions[1]?.category ?? ''},
-        ${data.nextSteps.join('; ')},
-        ${data.conversationHistory ?? ''}
+        ${record.timestamp},
+        ${record.organization},
+        ${record.domain},
+        ${record.readinessLevel},
+        ${record.primarySolution},
+        ${record.secondarySolution},
+        ${record.nextSteps},
+        ${record.conversationHistory}
       )
     `;
 
@@ -61,12 +76,14 @@ export async function submitToNeon(data: AssessmentData): Promise<SubmissionResu
       success: true,
       message: 'Assessment submitted successfully',
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     safeLogError('[neonSubmission] Error inserting assessment', error);
     return {
       success: false,
       message: 'Submission failed. Please try again.',
-      error: error.message,
+      error: error instanceof Error ? error.message : String(error),
     };
+  } finally {
+    clearTimeout(timeout);
   }
 }

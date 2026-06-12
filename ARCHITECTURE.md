@@ -116,12 +116,12 @@ The refactoring was done incrementally without breaking changes:
 │  └──────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
                             │
-                ┌───────────┴───────────┐
-                ▼                       ▼
-    ┌──────────────────┐    ┌──────────────────┐
-    │  Google AI API   │    │ Google Sheets    │
-    │  (Gemini 2.5)    │    │   (Webhook)      │
-    └──────────────────┘    └──────────────────┘
+            ┌───────────────┼───────────────┐
+            ▼               ▼               ▼
+  ┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐
+  │  Google AI API   │ │ Neon PostgreSQL  │ │ Google Sheets    │
+  │  (Gemini 2.5)    │ │ (primary store)  │ │ (alt. webhook)   │
+  └──────────────────┘ └──────────────────┘ └──────────────────┘
 ```
 
 ### Component Architecture Diagram
@@ -347,9 +347,13 @@ export async function submitAssessment(
 6. Backend Submission
    │
    ├─> POST /api/submit
-   │   ├─> submissionService.formatForGoogleSheets()
-   │   ├─> submissionService.signPayload()
-   │   └─> Sends to Google Sheets webhook
+   │   ├─> resolveStorageProvider() (STORAGE_PROVIDER env var, or auto-detect)
+   │   ├─> Neon: neonSubmissionService.submitToNeon()
+   │   │   └─> buildSubmissionRecord() → INSERT INTO assessments
+   │   └─> Google Sheets: submissionService.submitAssessment()
+   │       ├─> formatForGoogleSheets() (shared buildSubmissionRecord())
+   │       ├─> signPayload()
+   │       └─> Sends to Google Sheets webhook
    │
 7. Completion UI
    │
@@ -457,22 +461,38 @@ prepareMessagesForAI(messages: IncomingMessage[]): CoreMessage[]
 - Framework-agnostic
 - Fully testable
 
-### Submission Service (services/submissionService.ts)
+### Submission Services (services/)
 
-**Purpose**: Handle assessment data formatting and submission
+**Purpose**: Handle assessment data formatting and submission to the configured storage backend
 
-**Functions**:
+**Shared record builder** (`services/submissionRecord.ts`) — single source of truth for the
+AssessmentData → flat-record mapping used by every backend (strips NUL characters, re-applies
+PII redaction and the conversation-history size cap server-side):
+```typescript
+buildSubmissionRecord(data: AssessmentData): SubmissionRecord
+```
+
+**Google Sheets** (`services/submissionService.ts`):
 ```typescript
 formatForGoogleSheets(data: AssessmentData): GoogleSheetsData
 signPayload(data: GoogleSheetsData, secret?: string): string
 submitAssessment(data: AssessmentData, config: SubmissionConfig): Promise<SubmissionResult>
 ```
 
+**Neon PostgreSQL** (`services/neonSubmissionService.ts`):
+```typescript
+submitToNeon(data: AssessmentData): Promise<SubmissionResult>
+```
+
+The active backend is chosen per request by `resolveStorageProvider()` (`lib/storage-provider.ts`):
+an explicit `STORAGE_PROVIDER` env var wins; otherwise Neon is used when `DATABASE_URL` is set,
+falling back to Google Sheets.
+
 **Design**:
-- Configuration via parameters
-- Returns structured results
-- Handles errors gracefully
-- No HTTP dependencies
+- Configuration via parameters / environment
+- Both services return the same structured `SubmissionResult`
+- Handle errors gracefully (Neon inserts carry a 10s abort timeout)
+- Shared mapping prevents backend drift
 
 ## State Management
 

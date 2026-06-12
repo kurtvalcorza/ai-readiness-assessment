@@ -23,13 +23,17 @@ export function safeLogSubmissionResult(result: SubmissionResult): string {
 }
 
 /**
- * Logs a sanitized error with only the error type/name.
+ * Logs a sanitized error with only the error type/name and, when present,
+ * a short machine error code (e.g. a Postgres SQLSTATE like 42P01).
  * Never includes error.message or error.stack in output.
  */
 export function safeLogError(prefix: string, error: unknown): void {
+  const code = (error as { code?: unknown } | null | undefined)?.code;
+  const codeSuffix = typeof code === 'string' && /^[A-Za-z0-9_-]{1,16}$/.test(code) ? ` code=${code}` : '';
+
   if (error instanceof Error) {
-    console.error(prefix, `[${error.constructor.name}]`);
+    console.error(prefix, `[${error.constructor.name}${codeSuffix}]`);
   } else {
-    console.error(prefix, `[${typeof error}]`);
+    console.error(prefix, `[${typeof error}${codeSuffix}]`);
   }
 }

@@ -183,6 +183,9 @@ describe('Submission Service', () => {
     it('should submit successfully with webhook configured', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
+        status: 200,
+        redirected: false,
+        text: async () => JSON.stringify({ success: true }),
         json: async () => ({ success: true }),
       });
 
@@ -235,6 +238,7 @@ describe('Submission Service', () => {
       mockFetch.mockResolvedValue({
         ok: false,
         statusText: 'Internal Server Error',
+        text: async () => 'Server error details',
       });
 
       const data: AssessmentData = {
@@ -257,6 +261,9 @@ describe('Submission Service', () => {
     it('should handle Google Sheets script errors', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
+        status: 200,
+        redirected: false,
+        text: async () => JSON.stringify({ success: false, error: 'Script error' }),
         json: async () => ({ success: false, error: 'Script error' }),
       });
 

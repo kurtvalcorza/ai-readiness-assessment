@@ -87,7 +87,9 @@ function doPost(e) {
 
 5. Add Environment Variables:
    - `GOOGLE_GENERATIVE_AI_API_KEY`: Your Google AI API key
-   - `GOOGLE_SHEETS_WEBHOOK_URL`: The Web App URL from Step 1
+   - `DATABASE_URL`: Your Neon PostgreSQL connection string (primary storage — run `schema.sql` once in the Neon console first)
+   - `STORAGE_PROVIDER`: `neon` or `google_sheets` (optional — auto-detected from the configured credentials when unset)
+   - `GOOGLE_SHEETS_WEBHOOK_URL`: The Web App URL from Step 1 (only if using Google Sheets storage)
 
 6. Click **Deploy**
 
@@ -111,6 +113,8 @@ function doPost(e) {
 4. Add environment variables:
    ```bash
    vercel env add GOOGLE_GENERATIVE_AI_API_KEY
+   vercel env add DATABASE_URL
+   vercel env add STORAGE_PROVIDER
    vercel env add GOOGLE_SHEETS_WEBHOOK_URL
    ```
 
@@ -129,7 +133,7 @@ function doPost(e) {
 
 1. Visit your deployed URL
 2. Complete a test assessment
-3. Check your Google Sheet - you should see the response appear
+3. Check your storage backend - the response should appear in the Neon `assessments` table (or your Google Sheet)
 4. Try downloading the Markdown report
 
 ## Environment Variables Summary
@@ -138,6 +142,12 @@ Your `.env.local` file should contain:
 
 ```
 GOOGLE_GENERATIVE_AI_API_KEY=AIza...
+
+# Neon PostgreSQL (primary storage)
+DATABASE_URL=postgresql://user:pass@ep-xxx.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
+STORAGE_PROVIDER=neon
+
+# Google Sheets (alternative backend)
 GOOGLE_SHEETS_WEBHOOK_URL=https://script.google.com/macros/s/...
 ```
 
@@ -146,8 +156,8 @@ These same variables must be added to Vercel's environment settings.
 ## Monitoring and Analytics
 
 ### View Responses
-- All responses are automatically saved to your Google Sheet
-- You can create charts and pivot tables directly in Google Sheets
+- With Neon storage: query the `assessments` table in the Neon SQL Editor (`SELECT * FROM assessments ORDER BY created_at DESC`)
+- With Google Sheets: responses appear in your sheet, where you can build charts and pivot tables
 - Export to CSV for further analysis
 
 ### View Logs
@@ -157,9 +167,15 @@ These same variables must be added to Vercel's environment settings.
 
 ## Troubleshooting
 
+### Assessment not saving to Neon
+1. Check Vercel logs for `[neonSubmission]` errors (a `code=42P01` entry means the `assessments` table is missing — run `schema.sql` in the Neon console)
+2. Verify `DATABASE_URL` is set in the Vercel environment for Production (not just Preview)
+3. Verify `STORAGE_PROVIDER` is `neon` or unset (an unrecognized value logs a warning and falls back to auto-detection)
+4. Confirm the Neon project is active (free-tier computes suspend when idle; the first request after suspension is slower)
+
 ### Assessment not submitting to Google Sheets
 1. Check Vercel logs for errors
-2. Verify the webhook URL is correct
+2. Verify the webhook URL is correct and `STORAGE_PROVIDER=google_sheets` is set (or `DATABASE_URL` is unset, so auto-detection picks Sheets)
 3. Ensure the Apps Script is deployed as a web app with "Anyone" access
 4. Test the webhook URL directly with curl
 

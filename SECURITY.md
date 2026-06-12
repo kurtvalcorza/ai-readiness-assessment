@@ -31,9 +31,9 @@ The application implements multiple layers of security controls at both the fron
   - Displays on first visit with clear privacy notice
   - User can accept or decline data collection
   - Choice stored in localStorage
-  - Consent required for Google Sheets submission
+  - Consent required for data submission
 - **User Control**:
-  - Accept: Assessment data saved to Google Sheets
+  - Accept: Assessment data saved to the configured storage backend (Neon PostgreSQL by default, or Google Sheets)
   - Decline: Assessment works, but data not saved (PDF download still available)
   - Preference persists across sessions
 
@@ -256,18 +256,26 @@ Before storing conversation data in Google Sheets, the following sanitization is
 
 ---
 
-## 9. Google Sheets Integration Security
+## 9. Storage Integration Security
 
-### Webhook Security Considerations
+### Neon PostgreSQL (primary storage)
+- `DATABASE_URL` grants full SQL read/write over all collected assessment data — treat it as a high-value secret (more powerful than the append-only Sheets webhook)
+- Connection string must use `sslmode=require`
+- PII redaction and conversation-history size caps re-applied server-side before insert (`services/submissionRecord.ts`)
+- Queries are parameterized via the Neon driver's tagged-template API (no string-built SQL)
+- Inserts have a 10s abort timeout so hung connections fail fast
+- **Location**: `services/neonSubmissionService.ts`, `schema.sql`
+
+### Google Sheets Webhook (alternative backend)
 - Webhook URL should be treated as sensitive (contains random token)
 - Sanitized data sent (no raw user input, PII redacted)
 - Rate limiting prevents spam submissions
 - Input validation on both client and server
-- Consider adding HMAC signature verification in the future if abuse is detected
+- Optional HMAC signing via `WEBHOOK_SIGNING_SECRET`
 - **Location**: `app/api/submit/route.ts`, `lib/webhook-signing.ts`
 
 ### Data Privacy
-- Conversation history sanitized before storage
+- Conversation history sanitized before storage (client-side and again server-side)
 - PII redacted automatically
 - Users should be informed about data collection
 - Consider adding privacy policy and consent mechanisms
@@ -300,6 +308,7 @@ Before storing conversation data in Google Sheets, the following sanitization is
 - [ ] Environment variables configured correctly
 - [ ] `.env.local` not committed to git
 - [ ] HTTPS enabled (automatic on Vercel)
+- [ ] Neon `DATABASE_URL` kept confidential (grants full database access)
 - [ ] Google Sheets webhook URL kept confidential
 - [ ] Rate limiting tested and working
 - [ ] Input validation tested with edge cases
@@ -317,10 +326,11 @@ If you suspect a security issue:
 1. **Do Not** disable the application immediately (may alert attackers)
 2. **Review Logs**: Check server logs for unusual patterns
 3. **Check Rate Limits**: Verify if rate limiting is triggering
-4. **Review Google Sheets**: Check for suspicious submissions
-5. **Rotate Keys**: If compromise suspected, rotate Google AI API key
-6. **Update Webhook**: Generate new Google Sheets webhook URL if exposed
-7. **Document**: Record the incident and response actions taken
+4. **Review Stored Data**: Check the Neon `assessments` table (and/or Google Sheet) for suspicious submissions
+5. **Rotate Keys**: If compromise suspected, rotate the Google AI API key
+6. **Rotate Database Credentials**: If `DATABASE_URL` may be exposed, reset the database password/role in the Neon console immediately and review database access history
+7. **Update Webhook**: Generate new Google Sheets webhook URL if exposed
+8. **Document**: Record the incident and response actions taken
 
 ---
 
